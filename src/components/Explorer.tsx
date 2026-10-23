@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { exportInventory } from "../lib/exportInventory";
-import type { IntuneObject, Inventory } from "../lib/model";
+import type { GroupInfo, IntuneObject, Inventory } from "../lib/model";
 import type { SessionInfo } from "../lib/session";
 import { FilterLookup } from "./FilterLookup";
 import { GroupLookup } from "./GroupLookup";
@@ -12,11 +12,15 @@ type Tab = "policies" | "groups" | "filters";
 export function Explorer({
   inv,
   session,
+  demo,
+  searchGroups,
   onRefresh,
   onSignOut,
 }: {
   inv: Inventory;
   session: SessionInfo;
+  demo: boolean;
+  searchGroups: (term: string) => Promise<GroupInfo[]>;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
@@ -32,7 +36,7 @@ export function Explorer({
             <span className="brand">
               IntuneScope<span className="muted">.app</span>
             </span>
-            <span className="mode">Explorer · read-only</span>
+            <span className={demo ? "mode demo" : "mode"}>{demo ? "Demo · sample data" : "Explorer · read-only"}</span>
           </div>
           <div className="header-meta">
             <div className="tenant">
@@ -45,7 +49,7 @@ export function Explorer({
               Refresh
             </button>
             <button className="link small" onClick={onSignOut}>
-              Sign out
+              {demo ? "Exit demo" : "Sign out"}
             </button>
             <GitHubLink />
           </div>
@@ -65,9 +69,19 @@ export function Explorer({
         </nav>
       </header>
 
+      {demo && (
+        <div className="demo-banner" role="note">
+          <strong>Demo mode.</strong> You are looking at a fictional Contoso tenant with sample data — nothing is read from Microsoft. Exports work and
+          contain the sample data.{" "}
+          <button className="link" onClick={onSignOut}>
+            Exit demo
+          </button>
+        </div>
+      )}
+
       <main className="view">
         {tab === "policies" && <PolicyView inv={inv} onExport={onExport} />}
-        {tab === "groups" && <GroupLookup inv={inv} onExport={onExport} />}
+        {tab === "groups" && <GroupLookup inv={inv} onExport={onExport} search={searchGroups} />}
         {tab === "filters" && <FilterLookup inv={inv} onExport={onExport} />}
       </main>
     </div>
