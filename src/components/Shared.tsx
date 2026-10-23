@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { REPO_URL } from "../config";
-import type { Assignment, Inventory } from "../lib/model";
+import type { Assignment, IntuneObject, Inventory } from "../lib/model";
+import { useEditor, type BulkHint } from "./EditorContext";
 import { completeness, filterLabel, isOrphaned, targetName } from "../lib/query";
 
 export function GitHubLink() {
@@ -82,10 +83,30 @@ export function Completeness({ inv, extra }: { inv: Inventory; extra?: ReactNode
   );
 }
 
-/** Selection bar with export + the single v1.0 teaser. */
-export function SelectionBar({ count, note, onExport }: { count: number; note?: string; onExport: () => void }) {
+export function ModeBadge({ demo, editor }: { demo?: boolean; editor?: boolean }) {
+  if (demo) return <span className="mode demo">Demo · sample data</span>;
+  if (editor) return <span className="mode editor">Editor · read/write</span>;
+  return <span className="mode">Explorer · read-only</span>;
+}
+
+/** Selection bar: export, and bulk edit (Editor) or the Editor teaser (Explorer). */
+export function SelectionBar({
+  count,
+  note,
+  onExport,
+  objects = [],
+  hint,
+}: {
+  count: number;
+  note?: string;
+  onExport: () => void;
+  objects?: IntuneObject[];
+  hint?: BulkHint;
+}) {
   const [open, setOpen] = useState(false);
+  const { editor, canEditor, onSwitchToEditor, startBulkEdit } = useEditor();
   if (!count) return null;
+  const writable = new Set(objects.filter((o) => o.writable).map((o) => o.key)).size;
   return (
     <div className="selbar">
       <div className="selbar-row">
@@ -95,15 +116,26 @@ export function SelectionBar({ count, note, onExport }: { count: number; note?: 
           <button className="btn secondary compact" onClick={onExport}>
             Export selection
           </button>
-          <button className="btn ghost compact" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-            Bulk edit — coming in v1.0
-          </button>
+          {editor ? (
+            <button
+              className="btn compact editor-action"
+              disabled={!writable}
+              title={writable ? undefined : "None of the selected objects can be edited (apps, scripts and some templates are read-only)."}
+              onClick={() => startBulkEdit(objects, hint)}
+            >
+              Bulk edit {writable ? `${writable} ${writable === 1 ? "policy" : "policies"}` : "— nothing writable"}
+            </button>
+          ) : (
+            <button className="btn ghost compact" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+              {canEditor ? "Bulk edit…" : "Bulk edit — coming in v1.0"}
+            </button>
+          )}
         </div>
       </div>
-      {open && (
+      {open && !editor && (
         <div className="teaser">
           <p>
-            <strong>IntuneScope Editor (v1.0)</strong> will let you change assignments on the selected policies in one go:
+            <strong>IntuneScope Editor</strong> changes assignments on the selected policies in one go:
           </p>
           <ul>
             <li>Add an assignment (group, All Users or All Devices, with an optional filter)</li>
@@ -115,6 +147,11 @@ export function SelectionBar({ count, note, onExport }: { count: number; note?: 
             Every change is previewed before/after, backed up as JSON and verified after writing. The Editor uses a separate app registration with
             write permission, so your tenant can approve read-only access without ever granting write.
           </p>
+          {canEditor && (
+            <button className="btn compact editor-action" onClick={onSwitchToEditor}>
+              Sign in as Editor
+            </button>
+          )}
         </div>
       )}
     </div>

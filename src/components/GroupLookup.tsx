@@ -202,7 +202,12 @@ export function GroupLookup({
                 </button>
               </div>
 
-              <SelectionBar count={selected.size} onExport={() => onExport("xlsx", selectedObjects, `Group ${picked.name} — selection`)} />
+              <SelectionBar
+                count={selected.size}
+                onExport={() => onExport("xlsx", selectedObjects, `Group ${picked.name} — selection`)}
+                objects={selectedObjects}
+                hint={{ groupId: picked.id }}
+              />
             </>
           )}
         </section>

@@ -212,7 +212,7 @@ export async function searchGroups(term: string): Promise<GroupInfo[]> {
 }
 
 /** Load the full inventory. Each workload fails independently; failures are reported, never hidden. */
-export async function loadInventory(onProgress: Progress): Promise<Inventory> {
+export async function loadInventory(onProgress: Progress, opts: { skip?: WorkloadId[]; skipReason?: string } = {}): Promise<Inventory> {
   const status: WorkloadStatus[] = [
     { id: "filters", label: "Assignment filters", state: "queued", count: 0 },
     ...ADAPTERS.map((a): WorkloadStatus => ({ id: a.id, label: a.label, state: "queued", count: 0 })),
@@ -236,7 +236,9 @@ export async function loadInventory(onProgress: Progress): Promise<Inventory> {
 
   // Three workloads in parallel keeps us well under Intune's throttling limits.
   const objects: IntuneObject[] = [];
-  const queue = [...ADAPTERS];
+  const skip = new Set(opts.skip ?? []);
+  for (const a of ADAPTERS) if (skip.has(a.id)) set(a.id, { state: "skipped", detail: opts.skipReason ?? "Not loaded" });
+  const queue = ADAPTERS.filter((a) => !skip.has(a.id));
   const worker = async () => {
     for (let a = queue.shift(); a; a = queue.shift()) {
       const adapter = a;

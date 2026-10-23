@@ -14,9 +14,24 @@ export const GRAPH_SCOPES = [
   "https://graph.microsoft.com/User.Read", // signed-in user + tenant name
 ];
 
+/**
+ * IntuneScope Editor registration (read/write). A separate enterprise app so tenants can approve
+ * read-only Explorer without ever granting write. Empty = Editor disabled.
+ */
+export const EDITOR_CLIENT_ID: string = import.meta.env.VITE_EDITOR_CLIENT_ID ?? "";
+
+/** Delegated scopes for the Editor registration. Apps/scripts are not covered, so those workloads are skipped in Editor mode. */
+export const EDITOR_SCOPES = [
+  "https://graph.microsoft.com/DeviceManagementConfiguration.ReadWrite.All", // read + write policy assignments, filters
+  "https://graph.microsoft.com/Group.ReadBasic.All", // group names and search
+  "https://graph.microsoft.com/User.Read",
+];
+
 export const GRAPH_BETA = "https://graph.microsoft.com/beta";
 export const GRAPH_V1 = "https://graph.microsoft.com/v1.0";
 
 export const REPO_URL = "https://github.com/Simsen/IntuneScope";
 
-export const isConfigured = (): boolean => /^[0-9a-f-]{36}$/i.test(CLIENT_ID) && !/^0{8}-/.test(CLIENT_ID);
+const validId = (id: string) => /^[0-9a-f-]{36}$/i.test(id) && !/^0{8}-/.test(id);
+export const isConfigured = (): boolean => validId(CLIENT_ID);
+export const isEditorConfigured = (): boolean => validId(EDITOR_CLIENT_ID);

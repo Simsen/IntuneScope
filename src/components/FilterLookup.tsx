@@ -160,7 +160,12 @@ export function FilterLookup({
               </button>
             </div>
 
-            <SelectionBar count={selected.size} onExport={() => onExport("xlsx", selectedObjects, `Filter ${picked.name} — selection`)} />
+            <SelectionBar
+              count={selected.size}
+              onExport={() => onExport("xlsx", selectedObjects, `Filter ${picked.name} — selection`)}
+              objects={selectedObjects}
+              hint={{ filterId: picked.id }}
+            />
           </>
         )}
       </section>

@@ -81,7 +81,8 @@ export interface GroupInfo {
   name: string;
 }
 
-export type LoadState = "queued" | "loading" | "done" | "error";
+/** "skipped" = not loaded in this mode (e.g. apps/scripts in Editor mode — no consent for them). */
+export type LoadState = "queued" | "loading" | "done" | "error" | "skipped";
 
 export interface WorkloadStatus {
   id: WorkloadId | "filters" | "groups";

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AccountInfo } from "@azure/msal-browser";
-import { isConfigured } from "./config";
-import { initAuth, signIn, signOut } from "./lib/auth";
+import { isConfigured, isEditorConfigured } from "./config";
+import { currentMode, initAuth, signIn, signOut } from "./lib/auth";
 import { DEMO_SESSION, loadDemoInventory, searchDemoGroups } from "./lib/demo";
 import { describeError } from "./lib/graph";
 import { loadInventory, searchGroups } from "./lib/inventory";
@@ -21,6 +21,8 @@ export default function App() {
   const [status, setStatus] = useState<WorkloadStatus[]>([]);
   const [inv, setInv] = useState<Inventory | null>(null);
   const [demo, setDemo] = useState(false);
+  const mode = currentMode();
+  const editor = mode === "editor" && !demo;
 
   const load = useCallback(async () => {
     setDemo(false);
@@ -29,7 +31,14 @@ export default function App() {
     setStatus([]);
     try {
       setSession(await getSessionInfo());
-      setInv(await loadInventory(setStatus));
+      setInv(
+        await loadInventory(
+          setStatus,
+          currentMode() === "editor"
+            ? { skip: ["apps", "platformScripts", "shellScripts", "remediations"], skipReason: "Explorer only — not in Editor consent" }
+            : {},
+        ),
+      );
     } catch (e) {
       setError(describeError(e));
       setPhase("signedOut");
@@ -78,9 +87,11 @@ export default function App() {
   } else if (phase === "signedOut") {
     body = (
       <Landing
-        onSignIn={() => signIn(true)}
+        onSignIn={() => signIn("explorer", true)}
+        onEditorSignIn={() => signIn("editor", true)}
         onDemo={startDemo}
         canSignIn={isConfigured()}
+        canEditor={isEditorConfigured()}
         error={error}
       />
     );
@@ -91,6 +102,7 @@ export default function App() {
         session={session}
         done={!!inv}
         demo={demo}
+        editor={editor}
         onContinue={() => setPhase("ready")}
         onSignOut={demo ? exitDemo : signOut}
       />
@@ -101,8 +113,12 @@ export default function App() {
         inv={inv}
         session={session}
         demo={demo}
+        editor={editor}
+        canEditor={isEditorConfigured() && !demo}
+        onSwitchToEditor={() => signIn("editor", true)}
         searchGroups={demo ? searchDemoGroups : searchGroups}
         onRefresh={demo ? startDemo : load}
+        onDemoApplied={() => setInv((cur) => (cur ? { ...cur, objects: [...cur.objects] } : cur))}
         onSignOut={demo ? exitDemo : signOut}
       />
     );

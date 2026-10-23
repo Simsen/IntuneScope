@@ -209,6 +209,7 @@ export function PolicyView({
         count={selected.size}
         note={selPlatforms.size > 1 ? `${selPlatforms.size} platforms` : selPlatforms.size === 1 ? PLATFORM_LABEL[[...selPlatforms][0]] : undefined}
         onExport={() => onExport("xlsx", selectedObjects, `Selection (${selectedObjects.length} objects)`)}
+        objects={selectedObjects}
       />
     </>
   );

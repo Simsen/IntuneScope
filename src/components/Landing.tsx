@@ -1,8 +1,12 @@
-import { CLIENT_ID } from "../config";
+import { CLIENT_ID, EDITOR_CLIENT_ID } from "../config";
 import { GitHubLink } from "./Shared";
 
 // Grants the app's statically configured (read-only) permissions for the whole tenant.
 const consentUrl = `https://login.microsoftonline.com/organizations/adminconsent?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
+  window.location.origin + "/",
+)}`;
+
+const editorConsentUrl = `https://login.microsoftonline.com/organizations/adminconsent?client_id=${EDITOR_CLIENT_ID}&redirect_uri=${encodeURIComponent(
   window.location.origin + "/",
 )}`;
 
@@ -15,13 +19,17 @@ const STEPS = [
 
 export function Landing({
   onSignIn,
+  onEditorSignIn,
   onDemo,
   canSignIn,
+  canEditor,
   error,
 }: {
   onSignIn: () => void;
+  onEditorSignIn: () => void;
   onDemo: () => void;
   canSignIn: boolean;
+  canEditor: boolean;
   error?: string | null;
 }) {
   return (
@@ -52,20 +60,32 @@ export function Landing({
             <button className="btn" onClick={onSignIn} disabled={!canSignIn}>
               Sign in with Microsoft — Explorer
             </button>
-            <span className="soon-wrap">
-              <button
-                type="button"
-                className="btn secondary soon"
-                aria-disabled="true"
-                aria-describedby="editor-tip"
-                onClick={(e) => e.preventDefault()}
-              >
-                Sign in as Editor <span className="tag warn">Coming soon</span>
-              </button>
-              <span id="editor-tip" role="tooltip" className="tip">
-                In the making: bulk-update assignments and filters across many policies in one go — with preview, backup and verification built in.
+            {canEditor ? (
+              <span className="soon-wrap">
+                <button type="button" className="btn secondary editor-btn" aria-describedby="editor-tip" onClick={onEditorSignIn}>
+                  Sign in as Editor <span className="tag warn">Read/write</span>
+                </button>
+                <span id="editor-tip" role="tooltip" className="tip">
+                  Bulk-update assignments and filters across many policies — every change is previewed, backed up and verified. Uses a separate app
+                  registration with write permission.
+                </span>
               </span>
-            </span>
+            ) : (
+              <span className="soon-wrap">
+                <button
+                  type="button"
+                  className="btn secondary soon"
+                  aria-disabled="true"
+                  aria-describedby="editor-tip"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Sign in as Editor <span className="tag warn">Coming soon</span>
+                </button>
+                <span id="editor-tip" role="tooltip" className="tip">
+                  In the making: bulk-update assignments and filters across many policies in one go — with preview, backup and verification built in.
+                </span>
+              </span>
+            )}
             <button type="button" className="btn ghost demo-btn" onClick={onDemo}>
               Try the demo — Contoso sample tenant, no sign-in
             </button>
@@ -122,8 +142,21 @@ export function Landing({
                 </li>
               </ul>
               <p>
-                Delegated permissions never exceed your own Intune role. Admins can pre-approve the app with the{" "}
-                <a href={consentUrl}>admin consent link</a>.
+                <strong>Editor</strong> is a separate app registration (IntuneScope Editor) with delegated{" "}
+                <code>DeviceManagementConfiguration.ReadWrite.All</code>, <code>Group.ReadBasic.All</code> and <code>User.Read</code>. It writes only
+                assignments of Settings Catalog, Endpoint Security, Device configuration and Compliance policies — never apps, scripts or policy
+                settings. Tenants can approve Explorer without ever granting write, and restrict Editor with user assignment and Conditional Access.
+              </p>
+              <p>
+                Delegated permissions never exceed your own Intune role. Admins can pre-approve the apps with the{" "}
+                <a href={consentUrl}>Explorer admin consent link</a>
+                {canEditor && (
+                  <>
+                    {" "}
+                    and the <a href={editorConsentUrl}>Editor admin consent link</a>
+                  </>
+                )}
+                .
               </p>
             </div>
           </details>

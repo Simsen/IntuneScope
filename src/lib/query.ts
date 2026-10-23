@@ -68,7 +68,7 @@ export function completeness(status: WorkloadStatus[]): { searched: string[]; no
   for (const s of status) {
     if (s.id === "filters" || s.id === "groups") continue;
     if (s.state === "done") searched.push(s.label);
-    else notSearched.push(`${s.label}${s.error ? ` (${s.error})` : ""}`);
+    else notSearched.push(`${s.label}${s.error ? ` (${s.error})` : s.state === "skipped" && s.detail ? ` (${s.detail})` : ""}`);
   }
   return { searched, notSearched };
 }

@@ -1,14 +1,16 @@
 import type { WorkloadStatus } from "../lib/model";
 import type { SessionInfo } from "../lib/session";
+import { ModeBadge } from "./Shared";
 
-const GLYPH = { done: "✓", loading: "…", error: "!", queued: "·" } as const;
-const STATE = { done: "Loaded", loading: "Loading", error: "Failed", queued: "Queued" } as const;
+const GLYPH = { done: "✓", loading: "…", error: "!", queued: "·", skipped: "–" } as const;
+const STATE = { done: "Loaded", loading: "Loading", error: "Failed", queued: "Queued", skipped: "Skipped" } as const;
 
 export function Loading({
   status,
   session,
   done,
   demo,
+  editor,
   onContinue,
   onSignOut,
 }: {
@@ -16,13 +18,15 @@ export function Loading({
   session: SessionInfo | null;
   done: boolean;
   demo?: boolean;
+  editor?: boolean;
   onContinue: () => void;
   onSignOut: () => void;
 }) {
-  const finished = status.filter((s) => s.state === "done" || s.state === "error").length;
+  const finished = status.filter((s) => s.state === "done" || s.state === "error" || s.state === "skipped").length;
   const pct = status.length ? Math.round((finished / status.length) * 100) : 0;
   const objects = status.filter((s) => s.id !== "filters" && s.id !== "groups").reduce((n, s) => n + s.count, 0);
   const failed = status.filter((s) => s.state === "error");
+  const skipped = status.filter((s) => s.state === "skipped");
 
   return (
     <div className="app">
@@ -31,7 +35,7 @@ export function Loading({
           <span className="brand">
             IntuneScope<span className="muted">.app</span>
           </span>
-          <span className={demo ? "mode demo" : "mode"}>{demo ? "Demo · sample data" : "Explorer · read-only"}</span>
+          <ModeBadge demo={demo} editor={editor} />
         </div>
         {session && (
           <div className="who">
@@ -76,6 +80,13 @@ export function Loading({
             {failed.length} workload{failed.length > 1 ? "s" : ""} could not be loaded.
           </strong>{" "}
           Lookups will say what was not searched. Usually this means your Intune role can't read that workload.
+        </div>
+      )}
+
+      {skipped.length > 0 && (
+        <div className="card">
+          <strong>Editor mode loads only what it can edit or needs for lookups.</strong>{" "}
+          <span className="muted">{skipped.map((s) => s.label).join(", ")} are shown in Explorer — sign in as Explorer to see them.</span>
         </div>
       )}
 
