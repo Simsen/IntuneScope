@@ -13,7 +13,17 @@ const STEPS = [
   ["Export", "Excel or CSV, one row per assignment — ready to filter and pivot."],
 ];
 
-export function Landing({ onSignIn, error }: { onSignIn: () => void; error?: string | null }) {
+export function Landing({
+  onSignIn,
+  onDemo,
+  canSignIn,
+  error,
+}: {
+  onSignIn: () => void;
+  onDemo: () => void;
+  canSignIn: boolean;
+  error?: string | null;
+}) {
   return (
     <div className="app wide">
       <header className="top">
@@ -39,7 +49,7 @@ export function Landing({ onSignIn, error }: { onSignIn: () => void; error?: str
             </div>
           )}
           <div className="signin">
-            <button className="btn" onClick={onSignIn}>
+            <button className="btn" onClick={onSignIn} disabled={!canSignIn}>
               Sign in with Microsoft — Explorer
             </button>
             <span className="soon-wrap">
@@ -56,6 +66,9 @@ export function Landing({ onSignIn, error }: { onSignIn: () => void; error?: str
                 In the making: bulk-update assignments and filters across many policies in one go — with preview, backup and verification built in.
               </span>
             </span>
+            <button type="button" className="btn ghost demo-btn" onClick={onDemo}>
+              Try the demo — Contoso sample tenant, no sign-in
+            </button>
           </div>
           <p className="note muted small">
             Runs entirely in your browser — tokens and tenant data go only to Microsoft. Explorer requests read-only permissions.
