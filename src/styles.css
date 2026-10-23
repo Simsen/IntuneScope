@@ -91,7 +91,12 @@ body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 .signin .btn { margin-top: 0; }
 .hero { text-align: center; }
 .hero .lead { margin-left: auto; margin-right: auto; }
-.btn.soon:disabled { opacity: 1; color: var(--text); border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.btn.soon { cursor: not-allowed; color: var(--text); border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.soon-wrap { position: relative; display: grid; }
+.tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(360px, 90vw);
+  background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 13px; line-height: 1.4; padding: 8px 12px;
+  border-radius: 8px; box-shadow: 0 6px 20px rgb(0 0 0 / .25); opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 10; }
+.soon-wrap:hover .tip, .soon-wrap:focus-within .tip { opacity: 1; }
 .tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
 .tag.warn { background: var(--warn-bg); color: var(--warn); }
 
