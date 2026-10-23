@@ -56,7 +56,11 @@ export function RelationPill({ a }: { a: Assignment }) {
 }
 
 export function Writable({ yes }: { yes: boolean }) {
-  return <span className={yes ? "writable" : "muted small"}>{yes ? "Writable (v1.0)" : "Read-only"}</span>;
+  return (
+    <span className={yes ? "writable" : "muted small"} title={yes ? "Editable with IntuneScope Editor (v1.0)" : "Read-only in IntuneScope"}>
+      {yes ? "Writable" : "Read-only"}
+    </span>
+  );
 }
 
 /** "Searched / not searched" footer — completeness is part of every answer. */
