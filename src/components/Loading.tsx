@@ -8,12 +8,14 @@ export function Loading({
   status,
   session,
   done,
+  demo,
   onContinue,
   onSignOut,
 }: {
   status: WorkloadStatus[];
   session: SessionInfo | null;
   done: boolean;
+  demo?: boolean;
   onContinue: () => void;
   onSignOut: () => void;
 }) {
@@ -29,7 +31,7 @@ export function Loading({
           <span className="brand">
             IntuneScope<span className="muted">.app</span>
           </span>
-          <span className="mode">Explorer · read-only</span>
+          <span className={demo ? "mode demo" : "mode"}>{demo ? "Demo · sample data" : "Explorer · read-only"}</span>
         </div>
         {session && (
           <div className="who">
@@ -87,7 +89,7 @@ export function Loading({
           {done ? (failed.length ? "Continue with partial data" : "Continue") : "Loading…"}
         </button>
         <button className="btn secondary" onClick={onSignOut}>
-          Sign out
+          {demo ? "Exit demo" : "Sign out"}
         </button>
       </div>
     </div>
