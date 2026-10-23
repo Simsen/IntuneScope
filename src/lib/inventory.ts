@@ -5,6 +5,7 @@ import {
   appTypeLabel,
   deviceConfigTypeLabel,
   filterPlatformLabel,
+  isWritableTemplateFamily,
   normalizeAssignment,
   platformFromODataType,
   platformFromSettingsCatalog,
@@ -25,7 +26,7 @@ interface Adapter {
   path: string;
   select: string;
   writable: boolean;
-  map: (r: Raw) => Pick<IntuneObject, "name" | "typeLabel" | "platform">;
+  map: (r: Raw) => Pick<IntuneObject, "name" | "typeLabel" | "platform"> & { writable?: false };
 }
 
 const byName = (r: Raw) => (r.displayName ?? r.name ?? "(unnamed)") as string;
@@ -41,6 +42,8 @@ export const ADAPTERS: Adapter[] = [
       name: byName(r),
       typeLabel: settingsCatalogTypeLabel(r.templateReference?.templateFamily),
       platform: platformFromSettingsCatalog(r.platforms),
+      // Editor v1 writes plain Settings Catalog + modern Endpoint Security only (e.g. Autopilot DPP stays read-only).
+      ...(isWritableTemplateFamily(r.templateReference?.templateFamily) ? {} : { writable: false as const }),
     }),
   },
   {
