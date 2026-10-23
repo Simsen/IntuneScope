@@ -27,7 +27,7 @@ export function Landing({ onSignIn, error }: { onSignIn: () => void; error?: str
 
       <div className="landing">
         <section className="hero">
-          <h1 className="hero-title">See every Intune assignment — and what a group or filter really drives</h1>
+          <h1 className="hero-title">Every Intune Assignment. One Clear View.</h1>
           <p className="lead">
             Browse policies, look up any Entra group or assignment filter, and export the result — straight from your browser. No PowerShell,
             no install.
