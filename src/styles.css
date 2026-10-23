@@ -97,6 +97,11 @@ body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 13px; line-height: 1.4; padding: 8px 12px;
   border-radius: 8px; box-shadow: 0 6px 20px rgb(0 0 0 / .25); opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 10; }
 .soon-wrap:hover .tip, .soon-wrap:focus-within .tip { opacity: 1; }
+.demo-btn { grid-column: 1 / -1; color: var(--text); }
+.demo-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mode.demo { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+.demo-banner { margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--warn); background: var(--warn-bg); color: var(--warn); border-radius: 12px; font-size: 14px; }
+.demo-banner .link { color: var(--warn); text-decoration: underline; font-weight: 600; }
 .tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
 .tag.warn { background: var(--warn-bg); color: var(--warn); }
 
