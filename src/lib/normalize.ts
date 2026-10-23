@@ -71,6 +71,12 @@ export function filterPlatformLabel(p: string): string {
   return map[p] ?? humanize(p);
 }
 
+/** Settings Catalog families the Editor may write in v1: plain Settings Catalog and modern Endpoint Security. */
+export function isWritableTemplateFamily(templateFamily: string | undefined): boolean {
+  const f = templateFamily ?? "none";
+  return f === "none" || f.startsWith("endpointSecurity");
+}
+
 /** Type label for a Settings Catalog / modern Endpoint Security policy. */
 export function settingsCatalogTypeLabel(templateFamily: string | undefined): string {
   const f = templateFamily ?? "none";
@@ -180,6 +186,7 @@ export function normalizeAssignment(raw: RawAssignment): Assignment {
     a.filterId = fid;
     a.filterMode = ftype;
   }
-  if (raw.intent) a.appIntent = raw.intent;
+  // Apps carry required/available/uninstall; policy assignments carry a generic "apply"/"remove" that is noise in the UI.
+  if (raw.intent && raw.intent !== "apply" && raw.intent !== "remove") a.appIntent = raw.intent;
   return a;
 }
