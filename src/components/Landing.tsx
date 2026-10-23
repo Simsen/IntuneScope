@@ -26,7 +26,7 @@ export function Landing({ onSignIn, error }: { onSignIn: () => void; error?: str
       </header>
 
       <div className="landing">
-        <section>
+        <section className="hero">
           <h1 className="hero-title">See every Intune assignment — and what a group or filter really drives</h1>
           <p className="lead">
             Browse policies, look up any Entra group or assignment filter, and export the result — straight from your browser. No PowerShell,
@@ -42,7 +42,7 @@ export function Landing({ onSignIn, error }: { onSignIn: () => void; error?: str
             <button className="btn" onClick={onSignIn}>
               Sign in with Microsoft — Explorer
             </button>
-            <button className="btn secondary" disabled>
+            <button className="btn secondary soon" disabled title="The Editor (bulk changes) ships in v1.0">
               Sign in as Editor <span className="tag warn">v1.0</span>
             </button>
           </div>
