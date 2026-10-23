@@ -3,6 +3,7 @@ import { colName, toCsv, toXlsx } from "./export";
 import type { Inventory } from "./model";
 import {
   appTypeLabel,
+  isWritableTemplateFamily,
   normalizeAssignment,
   platformFromODataType,
   platformFromSettingsCatalog,
@@ -41,6 +42,21 @@ describe("normalizeAssignment", () => {
   it("keeps app intent", () => {
     const a = normalizeAssignment({ intent: "required", target: { "@odata.type": "#microsoft.graph.allLicensedUsersAssignmentTarget" } });
     expect(a).toMatchObject({ targetKind: "allUsers", appIntent: "required" });
+  });
+
+  it("drops the generic policy intent 'apply'", () => {
+    const a = normalizeAssignment({ intent: "apply", target: { "@odata.type": "#microsoft.graph.allDevicesAssignmentTarget" } });
+    expect(a.appIntent).toBeUndefined();
+  });
+});
+
+describe("Editor write scope", () => {
+  it("allows Settings Catalog and modern Endpoint Security only", () => {
+    expect(isWritableTemplateFamily(undefined)).toBe(true);
+    expect(isWritableTemplateFamily("none")).toBe(true);
+    expect(isWritableTemplateFamily("endpointSecurityAttackSurfaceReduction")).toBe(true);
+    expect(isWritableTemplateFamily("enrollmentConfiguration")).toBe(false);
+    expect(isWritableTemplateFamily("baseline")).toBe(false);
   });
 });
 
