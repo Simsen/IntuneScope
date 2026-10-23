@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { describeError } from "../lib/graph";
-import { searchGroups } from "../lib/inventory";
 import type { GroupInfo, IntuneObject, Inventory } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
 import { filterLabel, referencesToGroup, usageCounts } from "../lib/query";
@@ -9,9 +8,11 @@ import { Completeness, RelationPill, SelectionBar, Writable } from "./Shared";
 export function GroupLookup({
   inv,
   onExport,
+  search,
 }: {
   inv: Inventory;
   onExport: (format: "xlsx" | "csv", objects: IntuneObject[], scope: string) => void;
+  search: (term: string) => Promise<GroupInfo[]>;
 }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<GroupInfo | null>(null);
@@ -41,7 +42,7 @@ export function GroupLookup({
     setSearching(true);
     setSearchErr(null);
     try {
-      setTenantHits(await searchGroups(q.trim()));
+      setTenantHits(await search(q.trim()));
     } catch (e) {
       setSearchErr(describeError(e));
     } finally {
