@@ -42,9 +42,20 @@ export function Landing({ onSignIn, error }: { onSignIn: () => void; error?: str
             <button className="btn" onClick={onSignIn}>
               Sign in with Microsoft — Explorer
             </button>
-            <button className="btn secondary soon" disabled title="The Editor (bulk changes) ships in v1.0">
-              Sign in as Editor <span className="tag warn">v1.0</span>
-            </button>
+            <span className="soon-wrap">
+              <button
+                type="button"
+                className="btn secondary soon"
+                aria-disabled="true"
+                aria-describedby="editor-tip"
+                onClick={(e) => e.preventDefault()}
+              >
+                Sign in as Editor <span className="tag warn">Coming soon</span>
+              </button>
+              <span id="editor-tip" role="tooltip" className="tip">
+                In the making: bulk-update assignments and filters across many policies in one go — with preview, backup and verification built in.
+              </span>
+            </span>
           </div>
           <p className="note muted small">
             Runs entirely in your browser — tokens and tenant data go only to Microsoft. Explorer requests read-only permissions.
