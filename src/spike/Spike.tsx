@@ -75,6 +75,7 @@ export default function Spike() {
   const [results, setResults] = useState<Result[]>([]);
   const [plan, setPlan] = useState<{ candidates: Candidate[]; group: Raw; filter: Raw | null } | null>(null);
   const [includeTest, setIncludeTest] = useState(false);
+  const [manualGroupId, setManualGroupId] = useState("");
   const [busy, setBusy] = useState(false);
   const t0 = useRef(Date.now());
 
@@ -113,6 +114,8 @@ export default function Spike() {
       json = text;
     }
     if (res.status === 429) log("warn", `429 throttled on ${method} ${path} (Retry-After ${res.headers.get("Retry-After")})`);
+    else if (res.status >= 400)
+      log("err", `${method} ${path} → ${res.status} ${json?.error?.code ?? ""}: ${json?.error?.message ?? text.slice(0, 300)} (request-id ${res.headers.get("request-id") ?? "?"})`);
     return { status: res.status, json, ms };
   }
 
@@ -161,9 +164,20 @@ export default function Spike() {
       const comp = await call("GET", "/deviceManagement/deviceCompliancePolicies?$select=id,displayName&$top=100");
       await pick(comp.json?.value ?? [], "deviceCompliancePolicies", () => true, "Compliance");
 
-      const g = await call("GET", `${V1}/groups?$filter=securityEnabled eq true&$select=id,displayName&$top=1`);
-      const group = g.json?.value?.[0];
-      if (!group) throw new Error(`No security group readable (status ${g.status}).`);
+      let group: Raw | undefined;
+      const manual = manualGroupId.trim();
+      if (manual) {
+        const g = await call("GET", `/groups/${encodeURIComponent(manual)}?$select=id,displayName`);
+        group = g.status === 200 ? g.json : { id: manual, displayName: `(name not readable) ${manual}` };
+      } else {
+        const g = await call("GET", "/groups?$select=id,displayName&$top=5");
+        group = g.json?.value?.[0];
+        if (!group) {
+          const g2 = await call("GET", `${V1}/groups?$select=id,displayName&$top=5`);
+          group = g2.json?.value?.[0];
+        }
+      }
+      if (!group) throw new Error("No group readable — paste a group object ID below and run step 1 again (see the error lines above for Graph's reason).");
       const f = await call("GET", "/deviceManagement/assignmentFilters?$select=id,displayName,platform");
       const filter = (f.json?.value ?? []).find((x: Raw) => x.platform === "windows10AndLater") ?? null;
 
@@ -305,6 +319,10 @@ export default function Spike() {
             <button className="btn" disabled={busy} onClick={findPlan}>1 · Find unassigned test policies (read-only)</button>
             <button className="btn secondary" onClick={exit}>Exit</button>
           </div>
+          <label className="field small">
+            Optional: group object ID to use as the exclusion target (only needed if automatic lookup fails)
+            <input type="text" value={manualGroupId} onChange={(e) => setManualGroupId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" />
+          </label>
 
           {plan && (
             <section className="card">
