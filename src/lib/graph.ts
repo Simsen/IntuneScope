@@ -53,7 +53,9 @@ export async function graph<T>(path: string, init: RequestInit = {}, attempt = 0
     throw new GraphError(message, res.status, code, requestId);
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // Intune's /assign answers 200 with an EMPTY body (verified 2026-10-23) — that is success, not a parse error.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 interface Page<T> {

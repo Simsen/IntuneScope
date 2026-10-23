@@ -135,7 +135,21 @@ export async function applyChanges(rows: PreviewRow[], io: EditorIO, onRow: (i: 
         };
       }
     } catch (e) {
+      // A write that throws may still have been applied (network error after Intune accepted it).
+      // Re-read and report what Intune actually holds — never guess.
       out[i] = { ...out[i], status: "failed", message: errMessage(e) };
+      try {
+        const { targets: now } = extractTargets(await io.read(row.object));
+        if (signature(now) === signature(row.plan.after)) {
+          out[i] = { ...out[i], status: "ok", written: row.plan.after, readBack: now, message: `Applied — verified by read-back (write call reported: ${errMessage(e)})` };
+        } else if (signature(now) !== row.snapshot) {
+          out[i] = { ...out[i], readBack: now, message: `${errMessage(e)} — and the policy no longer matches the preview. Check it in Intune.` };
+        } else {
+          out[i] = { ...out[i], readBack: now, message: `${errMessage(e)} — nothing was changed.` };
+        }
+      } catch {
+        out[i] = { ...out[i], message: `${errMessage(e)} — could not re-read the policy; check it in Intune.` };
+      }
     }
     out[i].ms = Math.round(performance.now() - start);
     onRow(i, out[i]);

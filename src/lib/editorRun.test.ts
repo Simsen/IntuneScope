@@ -69,6 +69,21 @@ describe("applyChanges", () => {
     expect(out.map((r) => r.status)).toEqual(["failed", "verifyFailed", "ok"]);
   });
 
+  it("a write that throws but was applied is verified by read-back, not reported as failed", async () => {
+    const t = fakeTenant({ a: [buildTarget({ kind: "group", groupId: G1 }, "include", null)] });
+    const io: EditorIO = {
+      ...t.io,
+      async write(o, targets) {
+        await t.io.write(o, targets); // Intune applied it…
+        throw new Error("Unexpected end of JSON input"); // …but the client choked on the empty 200 body
+      },
+    };
+    const rows = await buildPreview([obj("a")], replaceOp, io);
+    const out = await applyChanges(rows, io, () => {});
+    expect(out[0].status).toBe("ok");
+    expect(out[0].message).toMatch(/verified by read-back/);
+  });
+
   it("can be stopped between policies", async () => {
     const t = fakeTenant({ a: [buildTarget({ kind: "group", groupId: G1 }, "include", null)], b: [buildTarget({ kind: "group", groupId: G1 }, "include", null)] });
     const rows = await buildPreview([obj("a"), obj("b")], replaceOp, t.io);

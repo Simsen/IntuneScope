@@ -182,6 +182,23 @@ export function BulkEdit({
   }
 
   const changes = preview?.filter((r) => r.plan.status === "change").length ?? 0;
+  const fName = (f: FilterRef | null) => (f ? `filter ${inv.filters.get(f.id)?.name ?? f.id} (${f.mode === "include" ? "include" : "exclude"} filtered devices)` : "no filter");
+  const opText = (o: Operation | null): { text: string; deploys: boolean } => {
+    if (!o) return { text: "", deploys: false };
+    switch (o.op) {
+      case "add":
+        return o.intent === "exclude"
+          ? { text: `EXCLUDE ${targetLabel(o.target)}`, deploys: false }
+          : { text: `INCLUDE ${targetLabel(o.target)} with ${fName(o.filter)}`, deploys: true };
+      case "replace":
+        return { text: `Replace ${targetLabel(o.from)} with ${targetLabel(o.to)} (include/exclude and filter kept)`, deploys: true };
+      case "remove":
+        return { text: `Remove ${targetLabel(o.target)}`, deploys: false };
+      case "changeFilter":
+        return { text: `Set ${fName(o.filter)} on assignments ${o.match.by === "target" ? `to ${targetLabel(o.match.target)}` : `using ${inv.filters.get(o.match.filterId)?.name ?? "that filter"}`}`, deploys: true };
+    }
+  };
+  const described = opText(op);
   const counts = (s: string) => preview?.filter((r) => r.plan.status === s).length ?? 0;
 
   return (
@@ -392,6 +409,15 @@ export function BulkEdit({
           {progress && <p className="muted">{progress}</p>}
           {preview && step === "preview" && (
             <div className="card">
+              <div style={{ marginBottom: 6 }}>
+                <span className="muted">Operation: </span>
+                <strong>{described.text}</strong>
+              </div>
+              {described.deploys && changes > 0 && (
+                <div className="warn-inline small" style={{ marginBottom: 6 }}>
+                  This changes which devices or users receive these policies as soon as Intune syncs.
+                </div>
+              )}
               <strong>
                 {changes} {changes === 1 ? "policy" : "policies"} will change
               </strong>
