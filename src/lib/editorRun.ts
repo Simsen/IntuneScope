@@ -6,6 +6,7 @@ import { batchGet, graph, GraphError } from "./graph";
 import {
   assignBody,
   extractTargets,
+  filterUnsupportedReason,
   planOperation,
   signature,
   WRITE_COLLECTION,
@@ -62,7 +63,9 @@ export async function buildPreview(objects: IntuneObject[], op: Operation, io: E
       const msg = r instanceof GraphError && (r.status === 401 || r.status === 403) ? "No access to read this policy's assignments." : r.message;
       return { object, raw: [], snapshot: "", plan: { status: "invalid", reason: `Could not read: ${msg}`, before: [], after: [] } };
     }
-    const { targets, blocked } = extractTargets(r);
+    const extracted = extractTargets(r);
+    const targets = extracted.targets;
+    const blocked = extracted.blocked ?? filterUnsupportedReason(op, object);
     const plan: PolicyPlan = blocked ? { status: "invalid", reason: blocked, before: targets, after: targets } : planOperation(targets, op);
     return { object, raw: r, snapshot: signature(targets), plan };
   });

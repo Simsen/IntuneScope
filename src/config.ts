@@ -20,7 +20,12 @@ export const GRAPH_SCOPES = [
  */
 export const EDITOR_CLIENT_ID: string = import.meta.env.VITE_EDITOR_CLIENT_ID ?? "";
 
-/** Delegated scopes for the Editor registration. Apps/scripts are not covered, so those workloads are skipped in Editor mode. */
+/**
+ * Delegated scopes requested at Editor sign-in. Deliberately unchanged when read permissions were added:
+ * the Editor registration ALSO lists DeviceManagementApps.Read.All and DeviceManagementScripts.Read.All
+ * (granted through admin consent). Entra puts every granted permission in the token, so tenants that
+ * re-approved get apps/scripts read-only, and tenants that didn't can still sign in (those workloads show as skipped).
+ */
 export const EDITOR_SCOPES = [
   "https://graph.microsoft.com/DeviceManagementConfiguration.ReadWrite.All", // read + write policy assignments, filters
   "https://graph.microsoft.com/Group.ReadBasic.All", // group names and search

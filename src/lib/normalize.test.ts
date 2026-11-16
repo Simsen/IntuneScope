@@ -3,7 +3,9 @@ import { colName, toCsv, toXlsx } from "./export";
 import type { Inventory } from "./model";
 import {
   appTypeLabel,
+  isConfigManagerPolicy,
   isWritableTemplateFamily,
+  supportsFilters,
   normalizeAssignment,
   platformFromODataType,
   platformFromSettingsCatalog,
@@ -142,5 +144,22 @@ describe("export", () => {
     const z = toXlsx([{ name: "S", header: ["h"], rows: [["v & <x>"]] }]);
     expect(z[0]).toBe(0x50); // "PK"
     expect(z[1]).toBe(0x4b);
+  });
+});
+
+describe("Editor eligibility per policy type", () => {
+  it("treats tenant-attach (Configuration Manager) policies as such", () => {
+    expect(isConfigManagerPolicy("configManager")).toBe(true);
+    expect(isConfigManagerPolicy("mdm,configManager")).toBe(true);
+    expect(isConfigManagerPolicy("mdm,microsoftSense")).toBe(false);
+    expect(isConfigManagerPolicy(undefined)).toBe(false);
+  });
+  it("knows which policy types don't support filters", () => {
+    expect(supportsFilters({ odataType: "#microsoft.graph.windowsWiredNetworkConfiguration" })).toBe(false);
+    expect(supportsFilters({ odataType: "#microsoft.graph.iosUpdateConfiguration" })).toBe(false);
+    expect(supportsFilters({ templateFamily: "endpointSecurityApplicationControl" })).toBe(false);
+    expect(supportsFilters({ odataType: "#microsoft.graph.windows10CustomConfiguration" })).toBe(true);
+    expect(supportsFilters({ templateFamily: "endpointSecurityFirewall" })).toBe(true);
+    expect(supportsFilters({ templateFamily: "none" })).toBe(true);
   });
 });

@@ -143,9 +143,10 @@ export function Landing({
               </ul>
               <p>
                 <strong>Editor</strong> is a separate app registration (IntuneScope Editor) with delegated{" "}
-                <code>DeviceManagementConfiguration.ReadWrite.All</code>, <code>Group.ReadBasic.All</code> and <code>User.Read</code>. It writes only
+                <code>DeviceManagementConfiguration.ReadWrite.All</code>, <code>DeviceManagementApps.Read.All</code>,{" "}
+                <code>DeviceManagementScripts.Read.All</code>, <code>Group.ReadBasic.All</code> and <code>User.Read</code>. It writes only
                 assignments of Settings Catalog, Endpoint Security, Device configuration and Compliance policies — never apps, scripts or policy
-                settings. Tenants can approve Explorer without ever granting write, and restrict Editor with user assignment and Conditional Access.
+                settings. Apps, scripts and remediations are read-only, so group and filter lookups stay complete. Tenants can approve Explorer without ever granting write, and restrict Editor with user assignment and Conditional Access.
               </p>
               <p>
                 Delegated permissions never exceed your own Intune role. Admins can pre-approve the apps with the{" "}
