@@ -80,3 +80,12 @@ For each profile type in the tenant, Editor → Change filter (set a filter), th
 - [ ] **Linux Settings Catalog policy:** confirm that no filter is offered. Intune has no Linux filter platform today.
 - [ ] **Windows 8.1 compliance policy (if any exist):** only Windows 10 and later filters are offered. Decide whether to allow `windows81AndLater` or make these read-only.
 - [ ] **Android work profile (`androidForWork…` / `androidWorkProfile…` device configuration):** a filter is offered and shows correctly in the portal.
+
+## 6. Apps and scripts read-only in Editor
+
+The Editor sign-in still requests the same scopes. The two read permissions come from the app registration through admin consent.
+
+- [ ] **Before re-approval:** sign in as Editor. You can sign in without a new consent prompt. Apps, Platform scripts, Shell scripts and Remediations show as *Skipped* ("may need admin re-approval"), and a group lookup lists them under "not searched".
+- [ ] Add `DeviceManagementApps.Read.All` and `DeviceManagementScripts.Read.All` (delegated) to the **Editor** app registration and run the Editor admin consent link.
+- [ ] **After re-approval:** sign out, then sign in as Editor again. All four load, they show as read-only, a group lookup matches Explorer's result for the same group, and Bulk edit leaves them out.
+- [ ] Decode the access token (jwt.ms). `scp` contains both `Read.All` permissions even though sign-in didn't request them. If it doesn't, they must be added to `EDITOR_SCOPES` (which makes re-approval mandatory before Editor sign-in works).

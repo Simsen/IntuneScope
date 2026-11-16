@@ -221,7 +221,18 @@ export async function searchGroups(term: string): Promise<GroupInfo[]> {
 }
 
 /** Load the full inventory. Each workload fails independently; failures are reported, never hidden. */
-export async function loadInventory(onProgress: Progress, opts: { skip?: WorkloadId[]; skipReason?: string } = {}): Promise<Inventory> {
+export interface LoadOptions {
+  skip?: WorkloadId[];
+  skipReason?: string;
+  /**
+   * Workloads whose read permission may not be granted (e.g. Editor registrations approved before apps/scripts
+   * read access was added). A 401/403 marks them "skipped" with `optionalReason` instead of "error".
+   */
+  optional?: WorkloadId[];
+  optionalReason?: string;
+}
+
+export async function loadInventory(onProgress: Progress, opts: LoadOptions = {}): Promise<Inventory> {
   const status: WorkloadStatus[] = [
     { id: "filters", label: "Assignment filters", state: "queued", count: 0 },
     ...ADAPTERS.map((a): WorkloadStatus => ({ id: a.id, label: a.label, state: "queued", count: 0 })),
@@ -246,6 +257,7 @@ export async function loadInventory(onProgress: Progress, opts: { skip?: Workloa
   // Three workloads in parallel keeps us well under Intune's throttling limits.
   const objects: IntuneObject[] = [];
   const skip = new Set(opts.skip ?? []);
+  const optional = new Set(opts.optional ?? []);
   for (const a of ADAPTERS) if (skip.has(a.id)) set(a.id, { state: "skipped", detail: opts.skipReason ?? "Not loaded" });
   const queue = ADAPTERS.filter((a) => !skip.has(a.id));
   const worker = async () => {
@@ -257,7 +269,11 @@ export async function loadInventory(onProgress: Progress, opts: { skip?: Workloa
         objects.push(...objs);
         set(adapter.id, { state: "done", count: objs.length, detail: `${objs.length} objects` });
       } catch (e) {
-        set(adapter.id, { state: "error", error: describeError(e) });
+        if (optional.has(adapter.id) && e instanceof GraphError && (e.status === 401 || e.status === 403)) {
+          set(adapter.id, { state: "skipped", count: 0, detail: opts.optionalReason ?? "No read access" });
+        } else {
+          set(adapter.id, { state: "error", error: describeError(e) });
+        }
       }
     }
   };

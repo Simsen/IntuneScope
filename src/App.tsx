@@ -35,7 +35,11 @@ export default function App() {
         await loadInventory(
           setStatus,
           currentMode() === "editor"
-            ? { skip: ["apps", "platformScripts", "shellScripts", "remediations"], skipReason: "Explorer only — not in Editor consent" }
+            ? {
+                // Read-only in Editor. Registrations approved before these read permissions were added return 403 → shown as skipped.
+                optional: ["apps", "platformScripts", "shellScripts", "remediations"],
+                optionalReason: "No read access — the Editor app may need admin re-approval",
+              }
             : {},
         ),
       );

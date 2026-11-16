@@ -85,8 +85,11 @@ export function Loading({
 
       {skipped.length > 0 && (
         <div className="card">
-          <strong>Editor mode loads only what it can edit or needs for lookups.</strong>{" "}
-          <span className="muted">{skipped.map((s) => s.label).join(", ")} are shown in Explorer — sign in as Explorer to see them.</span>
+          <strong>{skipped.map((s) => s.label).join(", ")} could not be read in Editor mode.</strong>{" "}
+          <span className="muted">
+            They are read-only in Editor and need the Editor app's apps and scripts read permissions. An admin can re-approve the Editor app
+            with its admin consent link, or sign in as Explorer to see them. Lookups say these weren't searched.
+          </span>
         </div>
       )}
 
