@@ -149,3 +149,17 @@ describe("assignment types beyond plain groups", () => {
     expect(restore).toEqual([{ intent: "remove", target: expect.not.objectContaining({ "@intunescope.assignment": expect.anything() }) }]);
   });
 });
+
+describe("policy types without filter support", () => {
+  const noFilters = { ...obj("a"), filtersSupported: false as const };
+  it("blocks setting a filter but allows removing one and plain target changes", async () => {
+    const F = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const t = fakeTenant({ a: [buildTarget({ kind: "group", groupId: G1 }, "include", { id: F, mode: "include" })] });
+    const set = await buildPreview([noFilters], { op: "add", target: { kind: "group", groupId: G2 }, intent: "include", filter: { id: F, mode: "include" } }, t.io);
+    expect(set[0].plan).toMatchObject({ status: "invalid", reason: expect.stringContaining("doesn't support assignment filters") });
+    const clear = await buildPreview([noFilters], { op: "changeFilter", match: { by: "filter", filterId: F }, filter: null }, t.io);
+    expect(clear[0].plan.status).toBe("change");
+    const plain = await buildPreview([noFilters], replaceOp, t.io);
+    expect(plain[0].plan.status).toBe("change");
+  });
+});

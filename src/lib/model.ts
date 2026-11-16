@@ -64,6 +64,8 @@ export interface IntuneObject {
   platform: PlatformKey;
   /** Will the v1.0 Editor be able to change this object's assignments? */
   writable: boolean;
+  /** false = Intune doesn't support assignment filters on this policy type (Graph accepts them anyway). */
+  filtersSupported?: false;
   assignments: Assignment[];
 }
 

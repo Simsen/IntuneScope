@@ -5,11 +5,13 @@ import {
   appTypeLabel,
   deviceConfigTypeLabel,
   filterPlatformLabel,
+  isConfigManagerPolicy,
   isWritableTemplateFamily,
   normalizeAssignment,
   platformFromODataType,
   platformFromSettingsCatalog,
   settingsCatalogTypeLabel,
+  supportsFilters,
 } from "./normalize";
 
 /**
@@ -26,7 +28,7 @@ interface Adapter {
   path: string;
   select: string;
   writable: boolean;
-  map: (r: Raw) => Pick<IntuneObject, "name" | "typeLabel" | "platform"> & { writable?: false };
+  map: (r: Raw) => Pick<IntuneObject, "name" | "typeLabel" | "platform" | "filtersSupported"> & { writable?: false };
 }
 
 const byName = (r: Raw) => (r.displayName ?? r.name ?? "(unnamed)") as string;
@@ -42,8 +44,10 @@ export const ADAPTERS: Adapter[] = [
       name: byName(r),
       typeLabel: settingsCatalogTypeLabel(r.templateReference?.templateFamily),
       platform: platformFromSettingsCatalog(r.platforms),
-      // Editor v1 writes plain Settings Catalog + modern Endpoint Security only (e.g. Autopilot DPP stays read-only).
-      ...(isWritableTemplateFamily(r.templateReference?.templateFamily) ? {} : { writable: false as const }),
+      // Editor v1 writes plain Settings Catalog + modern Endpoint Security only (e.g. Autopilot DPP stays read-only),
+      // and never tenant-attach (Configuration Manager) policies, which target collections.
+      ...(isWritableTemplateFamily(r.templateReference?.templateFamily) && !isConfigManagerPolicy(r.technologies) ? {} : { writable: false as const }),
+      ...(supportsFilters({ templateFamily: r.templateReference?.templateFamily }) ? {} : { filtersSupported: false as const }),
     }),
   },
   {
@@ -52,7 +56,12 @@ export const ADAPTERS: Adapter[] = [
     path: "/deviceManagement/deviceConfigurations",
     select: "id,displayName",
     writable: true,
-    map: (r) => ({ name: byName(r), typeLabel: deviceConfigTypeLabel(r["@odata.type"]), platform: platformFromODataType(r["@odata.type"]) }),
+    map: (r) => ({
+      name: byName(r),
+      typeLabel: deviceConfigTypeLabel(r["@odata.type"]),
+      platform: platformFromODataType(r["@odata.type"]),
+      ...(supportsFilters({ odataType: r["@odata.type"] }) ? {} : { filtersSupported: false as const }),
+    }),
   },
   {
     id: "compliance",

@@ -266,6 +266,12 @@ export function splitByPlatform(objects: IntuneObject[]): { batches: Map<Platfor
   return { batches, readOnly };
 }
 
+/** Does this operation put a filter on a policy whose type doesn't support filters? (Removing one is always allowed.) */
+export function filterUnsupportedReason(op: Operation, object: IntuneObject): string | null {
+  const setsFilter = (op.op === "add" && op.intent === "include" && op.filter) || (op.op === "changeFilter" && op.filter);
+  return setsFilter && object.filtersSupported === false ? "This policy type doesn't support assignment filters — Intune would ignore the filter." : null;
+}
+
 /** Is this operation's filter allowed for the batch platform? */
 export function filterAllowed(op: Operation, platform: PlatformKey, filterPlatform: (id: string) => string | undefined): string | null {
   const f = op.op === "add" || op.op === "changeFilter" ? op.filter : null;

@@ -16,6 +16,8 @@ Record for each case: date, result (Pass / Fail / Graph rejected), and the repor
 
 Before this fix the Editor sent only `{ target }`; it now also sends assignment fields such as `intent`.
 
+Docs (Graph beta, `deviceConfigurationAssignment`): `intent` (`apply` | `remove`) is writable; `source` and `sourceId` are read-only and are never sent. The live checks below confirm Graph behaves as documented.
+
 - [ ] **What Graph returns.** `GET /beta/deviceManagement/deviceConfigurations/{id}/assignments` on a few profile types. Note whether `intent` is present and its value.
 - [ ] **`intent: "apply"` is accepted on write.** Editor → Add `IS-TEST-A` to a Device configuration profile. Expect *Succeeded*. If Graph returns 400, the fix must stop sending `intent` (change `NOT_WRITTEN` in `src/lib/editor.ts`).
 - [ ] **A `remove` intent survives.** If a profile with `intent: "remove"` can be created (Graph Explorer `POST …/assign` with `"intent": "remove"`), run Editor → Add `IS-TEST-B` and check that the existing assignment still reads back with `intent: "remove"`.
@@ -28,8 +30,9 @@ Before this fix the Editor sent only `{ target }`; it now also sends assignment 
 Unknown target types are kept and posted back as read. This was only checked in unit tests.
 
 - [ ] **Configuration Manager collection target** (tenant attach). Take an Endpoint Security policy assigned to a collection, run Editor → Change filter or Add on it, and expect either *Succeeded* with the collection kept, or a clear Graph error. Note which.
-- [ ] **Decide whether ConfigMgr policies should be writable at all.** Endpoint Security policies whose `technologies` include `configManager` are assigned to collections, not Entra groups, and `isWritableTemplateFamily` currently marks them writable. If adding an Entra group to one is meaningless or rejected, make them read-only in `src/lib/inventory.ts`.
-- [ ] **Collection swap is detected.** Preview an edit on that policy, change its collection in the portal before applying, and expect *Changed since preview*.
+- [ ] **Tenant-attach policies are read-only.** Settings Catalog / Endpoint Security policies whose `technologies` include `configManager` are now never written (they target collections, not Entra groups). Check that such a policy shows as read-only in the Explorer and is left out of an Editor batch.
+- [ ] **Collection swap is detected.** Unit-tested only, because these policies are no longer writable. Re-test if that ever changes.
+- [ ] **Organizational unit targets** (`organizationalUnitAssignmentTarget`, in the Graph docs). If any exist in the tenant, run an Editor Add on that policy and check that the target is kept.
 - [ ] Any other target `@odata.type` seen in the tenant (check the Explorer's "Other target" rows): Editor run, then the result and read-back.
 
 ## 3. Extra properties on read-back
@@ -43,6 +46,11 @@ The verify step compares group / All users / All devices targets on type, groupI
 Graph does not validate whether a profile type supports filters. A filter on an unsupported type is silently accepted and never applies.
 
 Compare against Microsoft's "Supported workloads when creating filters" list (learn.microsoft.com → Intune → Filters → supported workloads).
+
+**Now enforced from the docs (2026-11-16):** setting a filter is refused in the preview for Wired network (Windows), the iOS/iPadOS update policy template (`iosUpdateConfiguration`), Endpoint Security Application control and security baselines (`supportsFilters` in `src/lib/normalize.ts`). Removing an existing filter stays allowed. Everything below is a spot check that the docs match reality.
+
+- [ ] On a Wired network profile, Editor → Change filter (set). Expect the preview to say the type doesn't support filters.
+- [ ] On an App Control for Business policy (Endpoint Security → Application control), same check. The docs list "Application control" under ASR exceptions, so confirm in the portal that this policy type really has no filter option. If it does, remove `endpointSecurityApplicationControl` from the block list.
 
 For each profile type in the tenant, Editor → Change filter (set a filter), then open the profile in the Intune portal:
 
@@ -62,7 +70,8 @@ For each profile type in the tenant, Editor → Change filter (set a filter), th
 | androidDeviceOwnerGeneralDeviceConfiguration | | | |
 | androidWorkProfileGeneralDeviceConfiguration | | | |
 
-- [ ] Every "No" becomes a block in the Editor, so filter operations are refused for that type and only target operations are allowed.
+- [ ] Every "No" not already in the list above gets added to `NO_FILTER_DEVICE_CONFIGS` / `NO_FILTER_TEMPLATE_FAMILIES`.
+- [ ] Policies using **Defender for Endpoint security settings management** (`technologies` includes `microsoftSense`): filters apply to Intune-enrolled devices but are ignored for MDE-only devices such as servers. Decide whether the Editor should warn about this.
 - [ ] Also check **All users / All devices** support for the same types (e.g. domain join is device-only).
 
 ## 5. Filter platforms
