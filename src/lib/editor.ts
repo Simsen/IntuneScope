@@ -18,6 +18,15 @@ export type RawTarget = {
 };
 export type RawAssignment = { target?: RawTarget; source?: string; [k: string]: unknown };
 
+/**
+ * Assignment-level fields (e.g. deviceConfigurationAssignment.intent = "apply" | "remove") ride along on the
+ * target under this reserved key, so the planner can keep working on targets without losing them.
+ * assignBody() moves them back onto the assignment; the key is never sent to Graph inside a target.
+ */
+export const ASSIGNMENT_FIELDS = "@intunescope.assignment";
+/** Read-only / bookkeeping fields of an assignment that are never written back. */
+const NOT_WRITTEN = new Set(["id", "target", "source", "sourceId"]);
+
 export type TargetRef = { kind: "group"; groupId: string } | { kind: "allUsers" } | { kind: "allDevices" };
 export type FilterRef = { id: string; mode: "include" | "exclude" };
 
@@ -115,28 +124,72 @@ function withFilter(t: RawTarget, filter: FilterRef | null): RawTarget {
   };
 }
 
-/** Order-independent signature of an assignment set — the compare-and-skip key. */
+const KNOWN_TYPES = new Set<string>(Object.values(T));
+const FILTER_KEYS = new Set(["deviceAndAppManagementAssignmentFilterId", "deviceAndAppManagementAssignmentFilterType"]);
+
+/** Sorted [key, value] pairs, dropping null/undefined (absent and null mean the same to Graph here). */
+const canonical = (o: Record<string, unknown>, skip: (k: string) => boolean) =>
+  JSON.stringify(
+    Object.keys(o)
+      .filter((k) => !skip(k) && o[k] !== null && o[k] !== undefined)
+      .sort()
+      .map((k) => [k, o[k]]),
+  );
+
+function assignmentFieldsOf(t: RawTarget): Record<string, unknown> {
+  const x = t[ASSIGNMENT_FIELDS];
+  return x && typeof x === "object" ? (x as Record<string, unknown>) : {};
+}
+
+/** Copy the assignment-level fields of `from` onto a newly built target. */
+function carryFields(from: RawTarget, to: RawTarget): RawTarget {
+  return from[ASSIGNMENT_FIELDS] ? { ...to, [ASSIGNMENT_FIELDS]: from[ASSIGNMENT_FIELDS] } : to;
+}
+
+/**
+ * Order-independent signature of an assignment set — the compare-and-skip and verify key.
+ * Known target types are keyed on type + groupId + filter (the shape verified on a live tenant).
+ * Any other target type (e.g. Configuration Manager collections) is keyed on ALL its properties, so
+ * collectionId and future identifiers count. Assignment-level fields count too; intent "apply" is the
+ * default and is treated as absent so a newly added assignment matches its read-back.
+ */
 export function signature(targets: RawTarget[]): string {
   return JSON.stringify(
     targets
       .map((t) => {
+        const type = t["@odata.type"] ?? "";
         const f = filterOf(t);
-        return [t["@odata.type"] ?? "", (t.groupId ?? "").toLowerCase(), f?.id.toLowerCase() ?? "", f?.mode ?? ""].join("|");
+        const ident = KNOWN_TYPES.has(type)
+          ? (t.groupId ?? "").toLowerCase()
+          : canonical(t, (k) => k === "@odata.type" || k === ASSIGNMENT_FIELDS || FILTER_KEYS.has(k) || k.startsWith("@odata."));
+        const fields = assignmentFieldsOf(t);
+        const extra = canonical(fields, (k) => k === "intent" && fields.intent === "apply");
+        return [type, ident, f?.id.toLowerCase() ?? "", f?.mode ?? "", extra].join("|");
       })
       .sort(),
   );
 }
 
-/** Raw /assignments response → targets, or a reason the policy must not be rewritten. */
+/** Raw /assignments response → targets (with assignment-level fields attached), or a reason the policy must not be rewritten. */
 export function extractTargets(assignments: RawAssignment[]): { targets: RawTarget[]; blocked?: string } {
+  const targets = assignments.map((a) => {
+    const { [ASSIGNMENT_FIELDS]: _ignored, ...target } = a.target ?? {};
+    const fields = Object.fromEntries(Object.entries(a).filter(([k, v]) => !NOT_WRITTEN.has(k) && !k.startsWith("@odata.") && v !== null && v !== undefined));
+    return Object.keys(fields).length ? { ...target, [ASSIGNMENT_FIELDS]: fields } : target;
+  });
   const fromSet = assignments.find((a) => a.source && a.source !== "direct");
-  if (fromSet) return { targets: assignments.map((a) => a.target ?? {}), blocked: "Has assignments from a policy set — change them in Intune." };
-  return { targets: assignments.map((a) => a.target ?? {}) };
+  if (fromSet) return { targets, blocked: "Has assignments from a policy set — change them in Intune." };
+  return { targets };
 }
 
-/** Request body for POST …/{id}/assign (identical for all three write collections). */
-export function assignBody(targets: RawTarget[]): { assignments: { target: RawTarget }[] } {
-  return { assignments: targets.map((target) => ({ target })) };
+/** Request body for POST …/{id}/assign (identical for all three write collections). Assignment-level fields are restored. */
+export function assignBody(targets: RawTarget[]): { assignments: ({ target: RawTarget } & Record<string, unknown>)[] } {
+  return {
+    assignments: targets.map((t) => {
+      const { [ASSIGNMENT_FIELDS]: _fields, ...target } = t;
+      return { ...assignmentFieldsOf(t), target };
+    }),
+  };
 }
 
 /** Apply one operation to one policy's current targets. Never throws. */
@@ -170,7 +223,7 @@ export function planOperation(before: RawTarget[], op: Operation): PolicyPlan {
       const after = before.map((t) => {
         if (!matchesTarget(t, op.from)) return t;
         const f = filterOf(t);
-        return buildTarget(op.to, isExclusion(t) ? "exclude" : "include", f);
+        return carryFields(t, buildTarget(op.to, isExclusion(t) ? "exclude" : "include", f));
       });
       return res("change", after);
     }

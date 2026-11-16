@@ -136,3 +136,36 @@ describe("guards", () => {
     expect(filterAllowed(op, "multi", () => "windows10AndLater")).toBeTruthy();
   });
 });
+
+describe("assignment-level fields and non-group targets", () => {
+  const raw = (target: RawTarget, extra: Record<string, unknown> = {}) => ({ id: "x", source: "direct", sourceId: null, ...extra, target });
+
+  it("extractTargets keeps intent, drops read-only fields; assignBody puts it back on the assignment", () => {
+    const { targets } = extractTargets([raw(inc(G1), { intent: "remove" }), raw(inc(G2))]);
+    expect(assignBody(targets)).toEqual({ assignments: [{ intent: "remove", target: inc(G1) }, { target: inc(G2) }] });
+  });
+
+  it("replace and changeFilter carry the intent to the rewritten target", () => {
+    const { targets } = extractTargets([raw(inc(G1), { intent: "remove" })]);
+    const moved = planOperation(targets, { op: "replace", from: { kind: "group", groupId: G1 }, to: { kind: "group", groupId: G2 } });
+    expect(assignBody(moved.after).assignments[0]).toMatchObject({ intent: "remove", target: { groupId: G2 } });
+    const filtered = planOperation(targets, { op: "changeFilter", match: { by: "target", target: { kind: "group", groupId: G1 } }, filter: { id: F1, mode: "include" } });
+    expect(assignBody(filtered.after).assignments[0]).toMatchObject({ intent: "remove", target: { deviceAndAppManagementAssignmentFilterId: F1 } });
+  });
+
+  it("signature tells intents apart but treats 'apply' as the default", () => {
+    const [apply] = extractTargets([raw(inc(G1), { intent: "apply" })]).targets;
+    const [remove] = extractTargets([raw(inc(G1), { intent: "remove" })]).targets;
+    expect(signature([apply])).toBe(signature([inc(G1)]));
+    expect(signature([remove])).not.toBe(signature([inc(G1)]));
+  });
+
+  it("signature tells Configuration Manager collections apart", () => {
+    expect(signature([weird])).not.toBe(signature([{ ...weird, collectionId: "SMS00002" }]));
+    expect(signature([weird])).toBe(signature([{ ...weird, deviceAndAppManagementAssignmentFilterId: null }]));
+  });
+
+  it("known target types keep the verified key (extra read-back properties don't fail verification)", () => {
+    expect(signature([{ ...inc(G1), someNewGraphProperty: "x" }])).toBe(signature([inc(G1)]));
+  });
+});
