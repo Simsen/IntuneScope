@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { AccountInfo } from "@azure/msal-browser";
 import { isConfigured, isEditorConfigured } from "./config";
 import { currentMode, initAuth, signIn, signOut } from "./lib/auth";
-import { DEMO_SESSION, loadDemoInventory, searchDemoGroups } from "./lib/demo";
+import { DEMO_SESSION, demoParentGroups, loadDemoInventory, searchDemoGroups } from "./lib/demo";
 import { describeError } from "./lib/graph";
-import { loadInventory, searchGroups } from "./lib/inventory";
+import { loadInventory, parentGroups, searchGroups } from "./lib/inventory";
 import type { Inventory, WorkloadStatus } from "./lib/model";
 import { getSessionInfo, type SessionInfo } from "./lib/session";
 import { Explorer } from "./components/Explorer";
@@ -121,6 +121,7 @@ export default function App() {
         canEditor={isEditorConfigured() && !demo}
         onSwitchToEditor={() => signIn("editor", true)}
         searchGroups={demo ? searchDemoGroups : searchGroups}
+        parentGroups={demo ? demoParentGroups : parentGroups}
         onRefresh={demo ? startDemo : load}
         onDemoApplied={() => setInv((cur) => (cur ? { ...cur, objects: [...cur.objects] } : cur))}
         onSignOut={demo ? exitDemo : signOut}

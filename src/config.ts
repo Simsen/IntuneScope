@@ -32,6 +32,12 @@ export const EDITOR_SCOPES = [
   "https://graph.microsoft.com/User.Read",
 ];
 
+/**
+ * Optional, requested only when someone ticks "Include parent groups" in Group lookup (incremental consent).
+ * Read-only: lets IntuneScope list the groups a group is nested in. Needs admin consent.
+ */
+export const NESTED_SCOPE = "https://graph.microsoft.com/GroupMember.Read.All";
+
 export const GRAPH_BETA = "https://graph.microsoft.com/beta";
 export const GRAPH_V1 = "https://graph.microsoft.com/v1.0";
 

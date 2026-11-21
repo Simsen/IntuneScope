@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { demoIO } from "../lib/demoEditor";
 import { graphIO } from "../lib/editorRun";
 import { exportInventory } from "../lib/exportInventory";
+import { nestedResume } from "../lib/nested";
 import type { GroupInfo, IntuneObject, Inventory } from "../lib/model";
 import type { SessionInfo } from "../lib/session";
 import { FilterLookup } from "./FilterLookup";
@@ -21,6 +22,7 @@ export function Explorer({
   canEditor,
   onSwitchToEditor,
   searchGroups,
+  parentGroups,
   onRefresh,
   onDemoApplied,
   onSignOut,
@@ -34,10 +36,12 @@ export function Explorer({
   onSwitchToEditor: () => void;
   onDemoApplied: () => void;
   searchGroups: (term: string) => Promise<GroupInfo[]>;
+  parentGroups: (groupId: string) => Promise<GroupInfo[]>;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("policies");
+  // Back from the optional nested-groups consent: reopen Group lookup.
+  const [tab, setTab] = useState<Tab>(() => (!demo && nestedResume() ? "groups" : "policies"));
   const [bulk, setBulk] = useState<{ objects: IntuneObject[]; hint?: BulkHint } | null>(null);
   const [stale, setStale] = useState(false);
   // Demo mode lets anyone try the Editor against the in-memory sample tenant.
@@ -145,7 +149,7 @@ export function Explorer({
           ) : (
             <>
               {tab === "policies" && <PolicyView inv={inv} onExport={onExport} />}
-              {tab === "groups" && <GroupLookup inv={inv} onExport={onExport} search={searchGroups} />}
+              {tab === "groups" && <GroupLookup inv={inv} onExport={onExport} search={searchGroups} parents={parentGroups} demo={demo} />}
               {tab === "filters" && <FilterLookup inv={inv} onExport={onExport} />}
             </>
           )}

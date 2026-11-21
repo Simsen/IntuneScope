@@ -3,7 +3,8 @@ import {
   PublicClientApplication,
   type AccountInfo,
 } from "@azure/msal-browser";
-import { CLIENT_ID, EDITOR_CLIENT_ID, EDITOR_SCOPES, GRAPH_SCOPES, REDIRECT_URI } from "../config";
+import { CLIENT_ID, EDITOR_CLIENT_ID, EDITOR_SCOPES, GRAPH_SCOPES, NESTED_SCOPE, REDIRECT_URI } from "../config";
+import { clearNestedResume, nestedResume, setNestedConsentError } from "./nested";
 
 /**
  * Two registrations behind one app: Explorer (read-only) and Editor (read/write).
@@ -64,7 +65,14 @@ export function initAuth(): Promise<AccountInfo | null> {
   ready ??= (async () => {
     const p = pca(currentMode());
     await p.initialize();
-    const result = await p.handleRedirectPromise();
+    let result = null;
+    try {
+      result = await p.handleRedirectPromise();
+    } catch (e) {
+      // Coming back from the optional nested-groups consent: keep the session, report the refusal in Group lookup.
+      if (!nestedResume()) throw e;
+      setNestedConsentError(e instanceof Error ? e.message : String(e));
+    }
     if (result?.account) p.setActiveAccount(result.account);
     const account = p.getActiveAccount() ?? p.getAllAccounts()[0] ?? null;
     if (account) p.setActiveAccount(account);
@@ -90,20 +98,43 @@ export async function signOut(): Promise<void> {
 }
 
 /** Access token for Graph. Falls back to an interactive redirect when consent/MFA/CA requires it. */
-export async function getToken(): Promise<string> {
+export async function getToken(scopes?: string[]): Promise<string> {
   const mode = currentMode();
   const p = pca(mode);
   const account = p.getActiveAccount();
   if (!account) throw new Error("Not signed in.");
   try {
-    const r = await p.acquireTokenSilent({ scopes: scopesFor(mode), account });
+    const r = await p.acquireTokenSilent({ scopes: scopes ?? scopesFor(mode), account });
     return r.accessToken;
   } catch (e) {
     if (e instanceof InteractionRequiredAuthError) {
+      if (scopes) throw new NeedsConsentError();
       await p.acquireTokenRedirect({ scopes: scopesFor(mode), account });
       // Navigation happens; this promise never resolves meaningfully.
       return new Promise(() => {});
     }
     throw e;
   }
+}
+
+/** The optional nested-groups permission hasn't been granted to this user/tenant yet. */
+export class NeedsConsentError extends Error {
+  constructor() {
+    super("Permission to read group membership has not been granted yet.");
+    this.name = "NeedsConsentError";
+  }
+}
+
+/** Ask for the optional GroupMember.Read.All permission. Leaves the page; Group lookup resumes after sign-in. */
+export async function requestNestedConsent(groupId: string): Promise<void> {
+  const p = pca(currentMode());
+  const account = p.getActiveAccount();
+  if (!account) throw new Error("Not signed in.");
+  clearNestedResume();
+  try {
+    sessionStorage.setItem("intunescope-nested", JSON.stringify({ groupId }));
+  } catch {
+    /* storage blocked: the user re-picks the group after sign-in */
+  }
+  await p.acquireTokenRedirect({ scopes: [NESTED_SCOPE], account });
 }

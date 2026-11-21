@@ -5,7 +5,7 @@
 IntuneScope is a browser-only tool for Microsoft Intune administrators. Sign in, and it loads your tenant's policies, apps and scripts with their assignments, so you can:
 
 - **Policies** — browse every object with its targets, assignment filters and filter mode, across all platforms.
-- **Group lookup** — pick an Entra group and see every policy, app, script and remediation that includes or excludes it.
+- **Group lookup** — pick an Entra group and see every policy, app, script and remediation that includes or excludes it. Optionally include its **parent groups** (nested membership, any depth), marked *via <parent>*.
 - **Filter lookup** — pick an assignment filter and see everything that uses it, in include or exclude mode.
 - **Export** — Excel (`.xlsx`, with an *About* sheet) or CSV, one row per assignment.
 - **Bulk edit** *(Editor)* — add, replace, remove assignments or change filters across many policies: preview → JSON backup → apply → verify.
@@ -34,6 +34,12 @@ IntuneScope Explorer requests **delegated, read-only** Microsoft Graph permissio
 | `DeviceManagementScripts.Read.All` | Platform scripts, macOS shell scripts, remediations |
 | `Group.ReadBasic.All` | Resolve group IDs to names and search groups — basic properties only, no membership |
 | `User.Read` | Signed-in user and tenant name |
+
+**Optional, asked only when needed:** ticking *Include parent groups* in Group lookup requests one more delegated, read-only permission through incremental consent. Nobody is asked for it until they use the option.
+
+| Permission | Why |
+|---|---|
+| `GroupMember.Read.All` | List the groups a group is nested in (`transitiveMemberOf`), so Group lookup can include assignments inherited through nested groups. Requires admin consent. |
 
 Delegated permissions never exceed the signed-in user's own rights: **Intune RBAC and scope tags still apply.** If your role can't see an object, IntuneScope can't either — and every lookup says which workloads were and weren't searched.
 
@@ -72,14 +78,14 @@ Editor:   https://login.microsoftonline.com/organizations/adminconsent?client_id
 
 ## Limits (by design)
 
-- **Direct references only.** A group nested inside an assigned group is not resolved.
+- **Nested groups are opt-in.** Group lookup shows direct references unless *Include parent groups* is ticked. Policies, Filter lookup and exports list the group that is actually assigned.
 - **Not device-level resolution.** IntuneScope shows what targets a group or filter — not what a specific device ends up receiving.
 - **Scope tags** silently reduce what Graph returns. Results are labelled accordingly; "0 references" is shown as *No references found in the workloads you can see*.
 
 ## Self-hosting
 
 1. Create an app registration in Microsoft Entra: **Single-page application**, redirect URI = the exact URL you will host on (with trailing slash), plus `http://localhost:5173/` for development.
-2. Add the delegated permissions above.
+2. Add the delegated permissions above (optionally `GroupMember.Read.All` too, so the admin consent link covers *Include parent groups*).
 3. Optional Editor: a second registration with the Editor permissions and the same redirect URIs.
 4. `cp .env.example .env.local` and set `VITE_CLIENT_ID` (and `VITE_EDITOR_CLIENT_ID` for Editor).
 5. `npm install && npm run dev` — or `npm run build` and publish `dist/` over HTTPS.

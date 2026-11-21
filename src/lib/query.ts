@@ -1,4 +1,4 @@
-import type { Assignment, IntuneObject, Inventory, WorkloadStatus } from "./model";
+import type { Assignment, GroupInfo, IntuneObject, Inventory, WorkloadStatus } from "./model";
 import { PLATFORM_LABEL } from "./model";
 
 /** Derived, display-ready data shared by the views and the exporter. */
@@ -36,11 +36,23 @@ export function filterLabel(a: Assignment, inv: Pick<Inventory, "filters">): str
 export interface Reference {
   object: IntuneObject;
   assignment: Assignment;
+  /** Set when the assignment targets a parent group the looked-up group is nested in. */
+  via?: GroupInfo;
 }
 
-export function referencesToGroup(inv: Inventory, groupId: string): Reference[] {
+/**
+ * Assignments that target the group directly, plus (optional) those that target any of its parent
+ * groups. Direct references come first; inherited ones are marked with `via`.
+ */
+export function referencesToGroup(inv: Inventory, groupId: string, parents: GroupInfo[] = []): Reference[] {
   const out: Reference[] = [];
+  const parentById = new Map(parents.filter((p) => p.id !== groupId).map((p) => [p.id, p]));
   for (const o of inv.objects) for (const a of o.assignments) if (a.groupId === groupId) out.push({ object: o, assignment: a });
+  for (const o of inv.objects)
+    for (const a of o.assignments) {
+      const via = a.groupId ? parentById.get(a.groupId) : undefined;
+      if (via) out.push({ object: o, assignment: a, via });
+    }
   return out;
 }
 

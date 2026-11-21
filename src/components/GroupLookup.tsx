@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { NeedsConsentError, requestNestedConsent } from "../lib/auth";
 import { describeError } from "../lib/graph";
+import { clearNestedResume, nestedConsentError, nestedResume } from "../lib/nested";
 import type { GroupInfo, IntuneObject, Inventory } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
 import { filterLabel, referencesToGroup, usageCounts } from "../lib/query";
@@ -9,13 +11,29 @@ export function GroupLookup({
   inv,
   onExport,
   search,
+  parents: loadParents,
+  demo,
 }: {
   inv: Inventory;
   onExport: (format: "xlsx" | "csv", objects: IntuneObject[], scope: string) => void;
   search: (term: string) => Promise<GroupInfo[]>;
+  /** Every group the given group is nested in (any depth). */
+  parents: (groupId: string) => Promise<GroupInfo[]>;
+  demo: boolean;
 }) {
+  // Back from the nested-groups consent: reopen the same group with the option on.
+  const [resume] = useState(() => (demo ? null : nestedResume()));
   const [q, setQ] = useState("");
-  const [picked, setPicked] = useState<GroupInfo | null>(null);
+  const [picked, setPicked] = useState<GroupInfo | null>(() =>
+    resume ? (inv.groups.get(resume.groupId) ?? { id: resume.groupId, name: resume.groupId }) : null,
+  );
+  const [nested, setNested] = useState(!!resume);
+  const [parents, setParents] = useState<GroupInfo[] | null>(null);
+  const [parentState, setParentState] = useState<"idle" | "loading" | "consent" | "error">("idle");
+  const [parentErr, setParentErr] = useState<string | null>(() => (resume ? nestedConsentError() : null));
+  useEffect(() => {
+    if (resume) clearNestedResume();
+  }, [resume]);
   const [tenantHits, setTenantHits] = useState<GroupInfo[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState<string | null>(null);
@@ -34,9 +52,45 @@ export function GroupLookup({
   const needle = q.trim().toLowerCase();
   const matches = needle ? candidates.filter((g) => g.name.toLowerCase().includes(needle) || g.id.includes(needle)).slice(0, 30) : candidates.slice(0, 30);
 
-  const refs = useMemo(() => (picked ? referencesToGroup(inv, picked.id) : []), [inv, picked]);
+  // Load the parent groups when the option is on. A refused consent is shown once and turns the option off.
+  useEffect(() => {
+    setParents(null);
+    if (!picked || !nested) {
+      setParentState("idle");
+      return;
+    }
+    if (parentErr) {
+      setParentState("error");
+      setNested(false);
+      return;
+    }
+    let live = true;
+    setParentState("loading");
+    loadParents(picked.id)
+      .then((list) => {
+        if (!live) return;
+        setParents(list);
+        setParentState("idle");
+      })
+      .catch((e) => {
+        if (!live) return;
+        if (e instanceof NeedsConsentError) setParentState("consent");
+        else {
+          setParentErr(describeError(e));
+          setParentState("error");
+        }
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked?.id, nested, loadParents]);
+
+  const refs = useMemo(() => (picked ? referencesToGroup(inv, picked.id, nested && parents ? parents : []) : []), [inv, picked, nested, parents]);
   const writable = refs.filter((r) => r.object.writable).length;
   const excludes = refs.filter((r) => r.assignment.intent === "exclude").length;
+  const inherited = refs.filter((r) => r.via).length;
+  const usedParents = parents ? parents.filter((p) => counts.has(p.id)) : [];
 
   async function searchTenant() {
     setSearching(true);
@@ -53,6 +107,11 @@ export function GroupLookup({
   const pick = (g: GroupInfo) => {
     setPicked(g);
     setSelected(new Set());
+  };
+
+  const toggleNested = (on: boolean) => {
+    setParentErr(null);
+    setNested(on);
   };
 
   const selectedObjects = refs.filter((r) => selected.has(r.object.key)).map((r) => r.object);
@@ -127,10 +186,45 @@ export function GroupLookup({
                 </div>
                 <div className="stats">
                   <Stat n={refs.length} label="references" />
+                  {nested && parents && <Stat n={inherited} label="via parent groups" cls="via" />}
                   <Stat n={writable} label="writable" cls="ok" />
                   <Stat n={refs.length - writable} label="read-only" cls="muted" />
                   <Stat n={excludes} label="as exclusion" cls="err" />
                 </div>
+                <div className="nested-row">
+                  <label className="nested-toggle">
+                    <input type="checkbox" checked={nested} onChange={(e) => toggleNested(e.target.checked)} />
+                    Include parent groups <span className="muted">(nested membership, any depth)</span>
+                  </label>
+                  {nested && parentState === "loading" && <span className="muted small">Reading group membership…</span>}
+                  {nested && parents && (
+                    <span className="muted small">
+                      {parents.length
+                        ? `Member of ${parents.length} parent group${parents.length === 1 ? "" : "s"}${usedParents.length < parents.length ? `, ${usedParents.length} with assignments` : ""}: ${parents.map((p) => p.name).join(", ")}`
+                        : "Not nested in any other group."}
+                    </span>
+                  )}
+                </div>
+                {nested && parentState === "consent" && (
+                  <div className="nested-consent">
+                    <p>
+                      <strong>One more permission.</strong> To find parent groups, IntuneScope needs to read group membership
+                      (<code>GroupMember.Read.All</code>, read-only). You'll go to Microsoft sign-in and come back to this group; the inventory
+                      reloads. If you aren't an admin, an admin may have to approve it first.
+                    </p>
+                    <div className="row-actions">
+                      <button className="btn compact" onClick={() => requestNestedConsent(picked.id)}>
+                        Continue to Microsoft sign-in
+                      </button>
+                      <button className="btn secondary compact" onClick={() => toggleNested(false)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {parentErr && (
+                  <p className="warn-inline small nested-err">Couldn't read parent groups: {parentErr}</p>
+                )}
               </div>
 
               <div className="card flush">
@@ -170,6 +264,11 @@ export function GroupLookup({
                           <td className="muted nowrap">{PLATFORM_LABEL[r.object.platform]}</td>
                           <td>
                             <RelationPill a={r.assignment} />
+                            {r.via && (
+                              <span className="via-tag" title={`Assigned to ${r.via.name}, which ${picked.name} is nested in`}>
+                                via {r.via.name}
+                              </span>
+                            )}
                           </td>
                           <td className="nowrap">
                             {r.assignment.filterId ? `${filterLabel(r.assignment, inv)} · ${r.assignment.filterMode === "exclude" ? "Exclude" : "Include"}` : "—"}
@@ -189,14 +288,23 @@ export function GroupLookup({
                     </tbody>
                   </table>
                 </div>
-                <Completeness inv={inv} extra={<span>Direct references only — membership through nested groups is not resolved.</span>} />
+                <Completeness
+                  inv={inv}
+                  extra={
+                    <span>
+                      {nested && parents
+                        ? `Direct references plus ${parents.length} parent group${parents.length === 1 ? "" : "s"} (nested, any depth).`
+                        : "Direct references only. Tick “Include parent groups” to add what is inherited through nested groups."}
+                    </span>
+                  }
+                />
               </div>
 
               <div className="head-actions">
                 <button
                   className="btn compact"
                   disabled={!refs.length}
-                  onClick={() => onExport("xlsx", [...new Map(refs.map((r) => [r.object.key, r.object])).values()], `Group: ${picked.name}`)}
+                  onClick={() => onExport("xlsx", [...new Map(refs.map((r) => [r.object.key, r.object])).values()], `Group: ${picked.name}${nested && parents ? ` (incl. ${parents.length} parent groups)` : ""}`)}
                 >
                   Export .xlsx
                 </button>

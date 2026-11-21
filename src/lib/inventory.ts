@@ -1,4 +1,4 @@
-import { GRAPH_V1 } from "../config";
+import { GRAPH_V1, NESTED_SCOPE } from "../config";
 import { batchGet, describeError, getAll, graph, GraphError } from "./graph";
 import type { AssignmentFilter, GroupInfo, IntuneObject, Inventory, PlatformKey, WorkloadId, WorkloadStatus } from "./model";
 import {
@@ -218,6 +218,22 @@ export async function searchGroups(term: string): Promise<GroupInfo[]> {
     headers: { ConsistencyLevel: "eventual" },
   });
   return r.value.map((g) => ({ id: g.id, name: g.displayName }));
+}
+
+/**
+ * Every group the given group is nested in, at any depth (transitiveMemberOf).
+ * Uses the optional GroupMember.Read.All permission; throws NeedsConsentError until it's granted.
+ */
+export async function parentGroups(groupId: string): Promise<GroupInfo[]> {
+  const rows = await getAll<{ "@odata.type"?: string; id: string; displayName?: string }>(
+    `${GRAPH_V1}/groups/${encodeURIComponent(groupId)}/transitiveMemberOf?$select=id,displayName&$top=999`,
+    undefined,
+    [NESTED_SCOPE],
+  );
+  return rows
+    .filter((r) => r["@odata.type"] === "#microsoft.graph.group")
+    .map((r) => ({ id: r.id, name: r.displayName ?? r.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Load the full inventory. Each workload fails independently; failures are reported, never hidden. */
