@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { IntuneObject, Inventory, PlatformKey, WorkloadId } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
 import { isOrphaned } from "../lib/query";
-import { AssignmentChip, Completeness, SelectionBar, Writable } from "./Shared";
+import { AssignmentChip, Completeness, FilterChip, SelectionBar, Writable } from "./Shared";
 
 type StateFilter = "any" | "unassigned" | "orphaned" | "filtered";
 const PAGE = 200;
@@ -158,7 +158,8 @@ export function PolicyView({
                 <th>Name</th>
                 <th>Platform</th>
                 <th>Type</th>
-                <th>Assignments · filter</th>
+                <th>Assignments</th>
+                <th>Filter</th>
                 <th>Edit</th>
               </tr>
             </thead>
@@ -171,13 +172,19 @@ export function PolicyView({
                   <td className="strong">{o.name}</td>
                   <td className="muted nowrap">{PLATFORM_LABEL[o.platform]}</td>
                   <td className="muted">{o.typeLabel}</td>
+                  {/* One line per assignment in both columns, so each filter sits next to its assignment. */}
                   <td>
-                    <div className="chips">
+                    <div className="stack">
                       {o.assignments.length ? (
-                        o.assignments.map((a, i) => <AssignmentChip key={i} a={a} inv={inv} />)
+                        o.assignments.map((a, i) => <AssignmentChip key={i} a={a} inv={inv} showFilter={false} />)
                       ) : (
                         <span className="chip none">Unassigned</span>
                       )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="stack">
+                      {o.assignments.map((a, i) => <FilterChip key={i} a={a} inv={inv} />)}
                     </div>
                   </td>
                   <td className="nowrap">
@@ -187,7 +194,7 @@ export function PolicyView({
               ))}
               {!visible.length && (
                 <tr>
-                  <td colSpan={6} className="empty">
+                  <td colSpan={7} className="empty">
                     No objects match these filters in the workloads you can see.
                   </td>
                 </tr>
