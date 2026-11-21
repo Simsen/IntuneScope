@@ -59,7 +59,7 @@ const AllDevicesIcon = () => (
  * Colour tells the target apart: All users / All devices = green, Entra group = blue,
  * any exclusion = red, orphaned (deleted) group = amber, other targets = grey.
  */
-export function AssignmentChip({ a, inv }: { a: Assignment; inv: Inventory }) {
+export function AssignmentChip({ a, inv, showFilter = true }: { a: Assignment; inv: Inventory; showFilter?: boolean }) {
   const orphan = isOrphaned(a, inv);
   const exclude = a.intent === "exclude";
   const kind = a.targetKind === "allUsers" || a.targetKind === "allDevices" ? "all" : a.targetKind === "group" ? "grp" : "other";
@@ -71,13 +71,26 @@ export function AssignmentChip({ a, inv }: { a: Assignment; inv: Inventory }) {
     <span className={cls} title={`${exclude ? "Excluded" : "Included"} · ${what}${a.groupId ? ` · ${a.groupId}` : ""}`}>
       <b>{sign}</b>
       {icon}
-      {targetName(a, inv)}
+      <span className="chip-name">{targetName(a, inv)}</span>
       {a.appIntent && <span className="chip-meta">{a.appIntent}</span>}
-      {a.filterId && (
+      {showFilter && a.filterId && (
         <span className="chip-filter">
           <FunnelIcon /> {filterLabel(a, inv)} · {a.filterMode === "exclude" ? "Excl" : "Incl"}
         </span>
       )}
+    </span>
+  );
+}
+
+/** The filter of one assignment, for the separate Filter column. Lines up with its AssignmentChip. */
+export function FilterChip({ a, inv }: { a: Assignment; inv: Inventory }) {
+  if (!a.filterId) return <span className="chip nofilter" aria-label="No filter">—</span>;
+  const exclude = a.filterMode === "exclude";
+  return (
+    <span className={`chip filter ${exclude ? "fexc" : "finc"}`} title={`${exclude ? "Exclude" : "Include"} devices matching this filter`}>
+      <FunnelIcon />
+      <span className="chip-name">{filterLabel(a, inv)}</span>
+      <span className="chip-meta">{exclude ? "Excl" : "Incl"}</span>
     </span>
   );
 }

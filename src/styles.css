@@ -203,6 +203,15 @@ table.grid .empty { text-align: center; color: var(--muted); padding: 32px; }
 /* Other targets (e.g. tenant-attach collections): grey */
 .chip.inc.other { background: color-mix(in srgb, var(--muted) 14%, var(--surface)); border-color: var(--border); }
 .chip.inc.all .chip-filter, .chip.inc.all .chip-meta { font-weight: 400; }
+/* Assignments and Filter columns: one line per assignment, same height, so the lines pair up */
+.stack { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.stack .chip { max-width: 300px; }
+.stack .chip-name { overflow: hidden; text-overflow: ellipsis; }
+/* Filter: violet, so it never reads as a target */
+.chip.filter { background: color-mix(in srgb, #8b5cf6 14%, var(--surface)); border-color: color-mix(in srgb, #8b5cf6 40%, transparent); color: var(--text); }
+.chip.filter > svg { color: #8b5cf6; }
+.chip.filter.fexc .chip-meta { color: var(--err); font-weight: 600; }
+.chip.nofilter { color: var(--muted); padding-left: 4px; padding-right: 4px; }
 .chip.orphan { background: var(--warn-bg); color: var(--warn); border: 1px dashed var(--warn); }
 .chip.none { background: var(--border); color: var(--muted); font-style: italic; }
 .chip-filter, .chip-meta { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding-left: 8px; border-left: 1px solid color-mix(in srgb, currentColor 30%, transparent); opacity: .9; }
