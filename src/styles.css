@@ -191,8 +191,18 @@ table.grid .check { width: 36px; }
 table.grid .empty { text-align: center; color: var(--muted); padding: 32px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
-.chip.inc { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); color: var(--text); }
-.chip.exc { background: var(--err-bg); color: var(--err); }
+.chip { border: 1px solid transparent; }
+.chip svg { flex: none; }
+/* Entra group, included: blue */
+.chip.inc { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 38%, transparent); color: var(--text); }
+.chip.inc.grp > svg { color: var(--accent); }
+/* All users / All devices, included: green */
+.chip.inc.all { background: var(--ok-bg); border-color: color-mix(in srgb, var(--ok) 45%, transparent); color: var(--ok); font-weight: 600; }
+/* Any exclusion: red */
+.chip.exc { background: var(--err-bg); border-color: color-mix(in srgb, var(--err) 50%, transparent); color: var(--err); }
+/* Other targets (e.g. tenant-attach collections): grey */
+.chip.inc.other { background: color-mix(in srgb, var(--muted) 14%, var(--surface)); border-color: var(--border); }
+.chip.inc.all .chip-filter, .chip.inc.all .chip-meta { font-weight: 400; }
 .chip.orphan { background: var(--warn-bg); color: var(--warn); border: 1px dashed var(--warn); }
 .chip.none { background: var(--border); color: var(--muted); font-style: italic; }
 .chip-filter, .chip-meta { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding-left: 8px; border-left: 1px solid color-mix(in srgb, currentColor 30%, transparent); opacity: .9; }

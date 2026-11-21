@@ -33,14 +33,45 @@ const FunnelIcon = () => (
   </svg>
 );
 
-/** One assignment rendered as a chip: +/− target, optional filter with mode. */
+const ic = { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const GroupIcon = () => (
+  <svg {...ic}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
+    <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3c2.1.7 3.5 2.8 3.5 5.7" />
+  </svg>
+);
+const AllUsersIcon = () => (
+  <svg {...ic}>
+    <circle cx="12" cy="12" r="9.5" />
+    <path d="M2.5 12h19M12 2.5c2.6 2.6 3.9 5.8 3.9 9.5s-1.3 6.9-3.9 9.5c-2.6-2.6-3.9-5.8-3.9-9.5s1.3-6.9 3.9-9.5z" />
+  </svg>
+);
+const AllDevicesIcon = () => (
+  <svg {...ic}>
+    <rect x="2.5" y="4" width="19" height="12.5" rx="2" />
+    <path d="M8 20.5h8M12 16.5v4" />
+  </svg>
+);
+
+/**
+ * One assignment rendered as a chip: +/− target, optional filter with mode.
+ * Colour tells the target apart: All users / All devices = green, Entra group = blue,
+ * any exclusion = red, orphaned (deleted) group = amber, other targets = grey.
+ */
 export function AssignmentChip({ a, inv }: { a: Assignment; inv: Inventory }) {
   const orphan = isOrphaned(a, inv);
-  const cls = orphan ? "chip orphan" : a.intent === "exclude" ? "chip exc" : "chip inc";
-  const sign = orphan ? "!" : a.intent === "exclude" ? "−" : "+";
+  const exclude = a.intent === "exclude";
+  const kind = a.targetKind === "allUsers" || a.targetKind === "allDevices" ? "all" : a.targetKind === "group" ? "grp" : "other";
+  const cls = orphan ? "chip orphan" : `chip ${exclude ? "exc" : "inc"} ${kind}`;
+  const sign = orphan ? "!" : exclude ? "−" : "+";
+  const icon = a.targetKind === "allUsers" ? <AllUsersIcon /> : a.targetKind === "allDevices" ? <AllDevicesIcon /> : a.targetKind === "group" ? <GroupIcon /> : null;
+  const what = a.targetKind === "group" ? "Entra group" : kind === "all" ? "Built-in target" : "Target";
   return (
-    <span className={cls} title={a.groupId ?? undefined}>
-      <b>{sign}</b> {targetName(a, inv)}
+    <span className={cls} title={`${exclude ? "Excluded" : "Included"} · ${what}${a.groupId ? ` · ${a.groupId}` : ""}`}>
+      <b>{sign}</b>
+      {icon}
+      {targetName(a, inv)}
       {a.appIntent && <span className="chip-meta">{a.appIntent}</span>}
       {a.filterId && (
         <span className="chip-filter">
