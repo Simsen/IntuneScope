@@ -19,8 +19,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const url = (path: string) => (path.startsWith("https://") ? path : `${GRAPH_BETA}${path}`);
 
 /** GET/POST with retry on 429 and transient 5xx (all calls in v0.x are reads, so retrying is safe). */
-export async function graph<T>(path: string, init: RequestInit = {}, attempt = 0, scopes?: string[]): Promise<T> {
-  const token = await getToken(scopes);
+export async function graph<T>(path: string, init: RequestInit = {}, attempt = 0): Promise<T> {
+  const token = await getToken();
   const res = await fetch(url(path), {
     ...init,
     headers: {
@@ -35,7 +35,7 @@ export async function graph<T>(path: string, init: RequestInit = {}, attempt = 0
   if (transient && attempt < 4) {
     const wait = Number(res.headers.get("Retry-After")) || 2 ** attempt * 2;
     await sleep(Math.min(wait, 30) * 1000);
-    return graph<T>(path, init, attempt + 1, scopes);
+    return graph<T>(path, init, attempt + 1);
   }
 
   if (!res.ok) {
@@ -64,11 +64,11 @@ interface Page<T> {
 }
 
 /** Follow @odata.nextLink until exhausted. `onPage` reports progress. */
-export async function getAll<T>(path: string, onPage?: (count: number) => void, scopes?: string[]): Promise<T[]> {
+export async function getAll<T>(path: string, onPage?: (count: number) => void): Promise<T[]> {
   const out: T[] = [];
   let next: string | undefined = path;
   while (next) {
-    const page: Page<T> = await graph<Page<T>>(next, {}, 0, scopes);
+    const page: Page<T> = await graph<Page<T>>(next);
     out.push(...(page.value ?? []));
     onPage?.(out.length);
     next = page["@odata.nextLink"];
