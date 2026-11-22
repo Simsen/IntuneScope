@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { describeError } from "../lib/graph";
 import type { GroupInfo, IntuneObject, Inventory } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
@@ -9,13 +9,19 @@ export function GroupLookup({
   inv,
   onExport,
   search,
+  parents: loadParents,
 }: {
   inv: Inventory;
   onExport: (format: "xlsx" | "csv", objects: IntuneObject[], scope: string) => void;
   search: (term: string) => Promise<GroupInfo[]>;
+  /** Every group the given group is nested in (any depth). */
+  parents: (groupId: string) => Promise<GroupInfo[]>;
 }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<GroupInfo | null>(null);
+  const [parents, setParents] = useState<GroupInfo[] | null>(null);
+  const [parentState, setParentState] = useState<"idle" | "loading" | "error">("idle");
+  const [parentErr, setParentErr] = useState<string | null>(null);
   const [tenantHits, setTenantHits] = useState<GroupInfo[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState<string | null>(null);
@@ -34,9 +40,38 @@ export function GroupLookup({
   const needle = q.trim().toLowerCase();
   const matches = needle ? candidates.filter((g) => g.name.toLowerCase().includes(needle) || g.id.includes(needle)).slice(0, 30) : candidates.slice(0, 30);
 
-  const refs = useMemo(() => (picked ? referencesToGroup(inv, picked.id) : []), [inv, picked]);
+  // Parent groups (nested membership, any depth) are always included.
+  useEffect(() => {
+    setParents(null);
+    setParentErr(null);
+    if (!picked) {
+      setParentState("idle");
+      return;
+    }
+    let live = true;
+    setParentState("loading");
+    loadParents(picked.id)
+      .then((list) => {
+        if (!live) return;
+        setParents(list);
+        setParentState("idle");
+      })
+      .catch((e) => {
+        if (!live) return;
+        setParentErr(describeError(e));
+        setParentState("error");
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked?.id, loadParents]);
+
+  const refs = useMemo(() => (picked ? referencesToGroup(inv, picked.id, parents ?? []) : []), [inv, picked, parents]);
   const writable = refs.filter((r) => r.object.writable).length;
   const excludes = refs.filter((r) => r.assignment.intent === "exclude").length;
+  const inherited = refs.filter((r) => r.via).length;
+  const usedParents = parents ? parents.filter((p) => counts.has(p.id)) : [];
 
   async function searchTenant() {
     setSearching(true);
@@ -127,10 +162,25 @@ export function GroupLookup({
                 </div>
                 <div className="stats">
                   <Stat n={refs.length} label="references" />
+                  {parents && <Stat n={inherited} label="via parent groups" cls="via" />}
                   <Stat n={writable} label="writable" cls="ok" />
                   <Stat n={refs.length - writable} label="read-only" cls="muted" />
                   <Stat n={excludes} label="as exclusion" cls="err" />
                 </div>
+                <div className="nested-row">
+                  <span className="nested-label">Parent groups</span>
+                  {parentState === "loading" && <span className="muted small">Reading group membership…</span>}
+                  {parents && (
+                    <span className="muted small">
+                      {parents.length
+                        ? `Member of ${parents.length} parent group${parents.length === 1 ? "" : "s"}${usedParents.length < parents.length ? `, ${usedParents.length} with assignments` : ""}: ${parents.map((p) => p.name).join(", ")}`
+                        : "Not nested in any other group."}
+                    </span>
+                  )}
+                </div>
+                {parentErr && (
+                  <p className="warn-inline small nested-err">Couldn't read parent groups: {parentErr}</p>
+                )}
               </div>
 
               <div className="card flush">
@@ -170,6 +220,11 @@ export function GroupLookup({
                           <td className="muted nowrap">{PLATFORM_LABEL[r.object.platform]}</td>
                           <td>
                             <RelationPill a={r.assignment} />
+                            {r.via && (
+                              <span className="via-tag" title={`Assigned to ${r.via.name}, which ${picked.name} is nested in`}>
+                                via {r.via.name}
+                              </span>
+                            )}
                           </td>
                           <td className="nowrap">
                             {r.assignment.filterId ? `${filterLabel(r.assignment, inv)} · ${r.assignment.filterMode === "exclude" ? "Exclude" : "Include"}` : "—"}
@@ -189,14 +244,23 @@ export function GroupLookup({
                     </tbody>
                   </table>
                 </div>
-                <Completeness inv={inv} extra={<span>Direct references only — membership through nested groups is not resolved.</span>} />
+                <Completeness
+                  inv={inv}
+                  extra={
+                    <span>
+                      {parents
+                        ? `Direct references plus ${parents.length} parent group${parents.length === 1 ? "" : "s"} (nested, any depth).`
+                        : "Direct references only (parent groups could not be read)."}
+                    </span>
+                  }
+                />
               </div>
 
               <div className="head-actions">
                 <button
                   className="btn compact"
                   disabled={!refs.length}
-                  onClick={() => onExport("xlsx", [...new Map(refs.map((r) => [r.object.key, r.object])).values()], `Group: ${picked.name}`)}
+                  onClick={() => onExport("xlsx", [...new Map(refs.map((r) => [r.object.key, r.object])).values()], `Group: ${picked.name}${parents ? ` (incl. ${parents.length} parent groups)` : ""}`)}
                 >
                   Export .xlsx
                 </button>

@@ -21,6 +21,7 @@ export function Explorer({
   canEditor,
   onSwitchToEditor,
   searchGroups,
+  parentGroups,
   onRefresh,
   onDemoApplied,
   onSignOut,
@@ -34,6 +35,7 @@ export function Explorer({
   onSwitchToEditor: () => void;
   onDemoApplied: () => void;
   searchGroups: (term: string) => Promise<GroupInfo[]>;
+  parentGroups: (groupId: string) => Promise<GroupInfo[]>;
   onRefresh: () => void;
   onSignOut: () => void;
 }) {
@@ -145,7 +147,7 @@ export function Explorer({
           ) : (
             <>
               {tab === "policies" && <PolicyView inv={inv} onExport={onExport} />}
-              {tab === "groups" && <GroupLookup inv={inv} onExport={onExport} search={searchGroups} />}
+              {tab === "groups" && <GroupLookup inv={inv} onExport={onExport} search={searchGroups} parents={parentGroups} />}
               {tab === "filters" && <FilterLookup inv={inv} onExport={onExport} />}
             </>
           )}

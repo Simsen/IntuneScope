@@ -135,7 +135,10 @@ export function Landing({
                   <code>DeviceManagementScripts.Read.All</code> — platform scripts, shell scripts, remediations
                 </li>
                 <li>
-                  <code>Group.ReadBasic.All</code> — group names only (no members)
+                  <code>Group.ReadBasic.All</code> — group names and search
+                </li>
+                <li>
+                  <code>GroupMember.Read.All</code> — which groups a group is nested in, so Group lookup includes inherited assignments
                 </li>
                 <li>
                   <code>User.Read</code> — who signed in, and the tenant name
@@ -144,7 +147,8 @@ export function Landing({
               <p>
                 <strong>Editor</strong> is a separate app registration (IntuneScope Editor) with delegated{" "}
                 <code>DeviceManagementConfiguration.ReadWrite.All</code>, <code>DeviceManagementApps.Read.All</code>,{" "}
-                <code>DeviceManagementScripts.Read.All</code>, <code>Group.ReadBasic.All</code> and <code>User.Read</code>. It writes only
+                <code>DeviceManagementScripts.Read.All</code>, <code>Group.ReadBasic.All</code>, <code>GroupMember.Read.All</code> and{" "}
+                <code>User.Read</code>. It writes only
                 assignments of Settings Catalog, Endpoint Security, Device configuration and Compliance policies — never apps, scripts or policy
                 settings. Apps, scripts and remediations are read-only, so group and filter lookups stay complete. Tenants can approve Explorer without ever granting write, and restrict Editor with user assignment and Conditional Access.
               </p>

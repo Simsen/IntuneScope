@@ -197,6 +197,28 @@ export async function loadDemoInventory(onProgress: (s: WorkloadStatus[]) => voi
   return { objects, filters, groups, orphanedGroupIds, status: status.map((s) => ({ ...s })), loadedAt: new Date() };
 }
 
+/** Demo nesting: child → parents it is a direct member of. SG-IT-ADMINS → SG-WIN-VIP → SG-WIN-PROD shows depth. */
+const DEMO_NESTING: Record<string, string[]> = {
+  "SG-IT-ADMINS": ["SG-WIN-VIP", "SG-Intune-Licensed"],
+  "SG-WIN-VIP": ["SG-WIN-PROD"],
+  "SG-FINANCE": ["SG-Intune-Licensed"],
+  "SG-IOS-EXEC": ["SG-IOS-ALL"],
+  "SG-MAC-PILOT": ["SG-MAC-ALL"],
+};
+
+/** Demo version of parentGroups: transitive, no sign-in or consent. */
+export async function demoParentGroups(groupId: string): Promise<GroupInfo[]> {
+  const nameById = new Map(Object.entries(G).map(([n, gid]) => [gid, n]));
+  const seen = new Set<string>();
+  const walk = (name: string) => {
+    for (const p of DEMO_NESTING[name] ?? []) if (!seen.has(p)) (seen.add(p), walk(p));
+  };
+  const start = nameById.get(groupId);
+  if (start) walk(start);
+  await sleep(250);
+  return [...seen].map((n) => ({ id: G[n], name: n })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Local group search for demo mode (includes a group nothing references). */
 export async function searchDemoGroups(term: string): Promise<GroupInfo[]> {
   const all = [...GROUP_NAMES, "SG-HR", "SG-Contractors"].map((n, i) => ({ id: G[n] ?? id(0x180 + i), name: n }));

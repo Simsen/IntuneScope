@@ -29,7 +29,7 @@ export function exportInventory(format: "xlsx" | "csv", objects: IntuneObject[],
     ["Not searched", notSearched.length ? notSearched.join("; ") : "None"],
     [],
     ["Note", "Results are limited to objects the signed-in user's Intune role and scope tags can see."],
-    ["Note", "Group references are direct only; membership through nested groups is not resolved."],
+    ["Note", "Group references are direct, unless the scope above says parent groups are included (Group lookup option)."],
   ];
   const xlsx = toXlsx([
     { name: "Assignments", header: EXPORT_COLUMNS, rows, widths: [40, 18, 30, 12, 34, 12, 10, 12, 28, 11, 10, 38, 38, 38] },

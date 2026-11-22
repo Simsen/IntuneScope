@@ -311,3 +311,10 @@ table.grid .empty { text-align: center; color: var(--muted); padding: 32px; }
 .confirm { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
 .split-list { display: grid; gap: 8px; }
 .split-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; }
+
+/* Group lookup: parent groups (nested membership) */
+.nested-row { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.nested-label { font-weight: 600; }
+.nested-err { flex-basis: 100%; margin: 8px 0 0; }
+.via-tag { display: inline-block; margin-left: 6px; font-size: 12px; color: #8b5cf6; font-weight: 600; white-space: nowrap; }
+.stat-n.via { color: #8b5cf6; }

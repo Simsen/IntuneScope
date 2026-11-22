@@ -5,7 +5,7 @@
 IntuneScope is a browser-only tool for Microsoft Intune administrators. Sign in, and it loads your tenant's policies, apps and scripts with their assignments, so you can:
 
 - **Policies** — browse every object with its targets, assignment filters and filter mode, across all platforms.
-- **Group lookup** — pick an Entra group and see every policy, app, script and remediation that includes or excludes it.
+- **Group lookup** — pick an Entra group and see every policy, app, script and remediation that includes or excludes it. Assignments inherited through its **parent groups** (nested membership, any depth) are included, marked *via <parent>*.
 - **Filter lookup** — pick an assignment filter and see everything that uses it, in include or exclude mode.
 - **Export** — Excel (`.xlsx`, with an *About* sheet) or CSV, one row per assignment.
 - **Bulk edit** *(Editor)* — add, replace, remove assignments or change filters across many policies: preview → JSON backup → apply → verify.
@@ -32,7 +32,8 @@ IntuneScope Explorer requests **delegated, read-only** Microsoft Graph permissio
 | `DeviceManagementConfiguration.Read.All` | Settings catalog, endpoint security, device configuration, compliance, update profiles, ADMX, assignment filters |
 | `DeviceManagementApps.Read.All` | Apps and app assignments |
 | `DeviceManagementScripts.Read.All` | Platform scripts, macOS shell scripts, remediations |
-| `Group.ReadBasic.All` | Resolve group IDs to names and search groups — basic properties only, no membership |
+| `Group.ReadBasic.All` | Resolve group IDs to names and search groups — basic properties only |
+| `GroupMember.Read.All` | List the groups a group is nested in (`transitiveMemberOf`), so Group lookup includes assignments inherited through parent groups. Requires admin consent. |
 | `User.Read` | Signed-in user and tenant name |
 
 Delegated permissions never exceed the signed-in user's own rights: **Intune RBAC and scope tags still apply.** If your role can't see an object, IntuneScope can't either — and every lookup says which workloads were and weren't searched.
@@ -45,9 +46,12 @@ IntuneScope **Editor** requests:
 | `DeviceManagementApps.Read.All` | Show apps read-only, so lookups are complete |
 | `DeviceManagementScripts.Read.All` | Show platform scripts, shell scripts and remediations read-only, so lookups are complete |
 | `Group.ReadBasic.All` | Group names and search |
+| `GroupMember.Read.All` | Parent groups in Group lookup (nested membership) |
 | `User.Read` | Signed-in user and tenant name |
 
 Editor never changes policy settings, apps or scripts. Apps, scripts and remediations are loaded **read-only** so group and filter lookups are complete; Autopilot, security baselines and other templates are also read-only.
+
+> **Upgrading to v0.1.9:** `GroupMember.Read.All` is now required by both registrations. Add it (delegated) to the Explorer **and** Editor app registrations, then re-run both admin consent links. Users who signed in before are sent through Microsoft consent again on their next visit; until an admin approves it, non-admins see *Need admin approval*.
 
 > **Upgrading an existing Editor registration:** add the two `Read.All` permissions to the Editor app registration and re-run the Editor admin consent link. Until then the Editor still signs in and works; apps and scripts are shown as *not read* and lookups say so.
 
@@ -72,7 +76,7 @@ Editor:   https://login.microsoftonline.com/organizations/adminconsent?client_id
 
 ## Limits (by design)
 
-- **Direct references only.** A group nested inside an assigned group is not resolved.
+- **Nested groups go upwards only.** Group lookup adds what a group inherits from its parent groups; it does not expand child groups. Policies, Filter lookup and exports list the group that is actually assigned.
 - **Not device-level resolution.** IntuneScope shows what targets a group or filter — not what a specific device ends up receiving.
 - **Scope tags** silently reduce what Graph returns. Results are labelled accordingly; "0 references" is shown as *No references found in the workloads you can see*.
 

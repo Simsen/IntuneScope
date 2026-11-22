@@ -11,6 +11,7 @@ export const GRAPH_SCOPES = [
   "https://graph.microsoft.com/DeviceManagementApps.Read.All", // apps + app assignments
   "https://graph.microsoft.com/DeviceManagementScripts.Read.All", // platform scripts, shell scripts, remediations
   "https://graph.microsoft.com/Group.ReadBasic.All", // resolve group IDs to display names, group search
+  "https://graph.microsoft.com/GroupMember.Read.All", // parent groups (transitiveMemberOf) for Group lookup
   "https://graph.microsoft.com/User.Read", // signed-in user + tenant name
 ];
 
@@ -21,14 +22,15 @@ export const GRAPH_SCOPES = [
 export const EDITOR_CLIENT_ID: string = import.meta.env.VITE_EDITOR_CLIENT_ID ?? "";
 
 /**
- * Delegated scopes requested at Editor sign-in. Deliberately unchanged when read permissions were added:
- * the Editor registration ALSO lists DeviceManagementApps.Read.All and DeviceManagementScripts.Read.All
+ * Delegated scopes requested at Editor sign-in. GroupMember.Read.All is required (v0.1.9): signed-in users without it
+ * are sent through consent again. The Editor registration ALSO lists DeviceManagementApps.Read.All and DeviceManagementScripts.Read.All
  * (granted through admin consent). Entra puts every granted permission in the token, so tenants that
  * re-approved get apps/scripts read-only, and tenants that didn't can still sign in (those workloads show as skipped).
  */
 export const EDITOR_SCOPES = [
   "https://graph.microsoft.com/DeviceManagementConfiguration.ReadWrite.All", // read + write policy assignments, filters
   "https://graph.microsoft.com/Group.ReadBasic.All", // group names and search
+  "https://graph.microsoft.com/GroupMember.Read.All", // parent groups (transitiveMemberOf) for Group lookup
   "https://graph.microsoft.com/User.Read",
 ];
 

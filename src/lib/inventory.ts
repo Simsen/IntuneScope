@@ -220,6 +220,20 @@ export async function searchGroups(term: string): Promise<GroupInfo[]> {
   return r.value.map((g) => ({ id: g.id, name: g.displayName }));
 }
 
+/**
+ * Every group the given group is nested in, at any depth (transitiveMemberOf).
+ * Needs GroupMember.Read.All (part of the standard sign-in for both registrations).
+ */
+export async function parentGroups(groupId: string): Promise<GroupInfo[]> {
+  const rows = await getAll<{ "@odata.type"?: string; id: string; displayName?: string }>(
+    `${GRAPH_V1}/groups/${encodeURIComponent(groupId)}/transitiveMemberOf?$select=id,displayName&$top=999`,
+  );
+  return rows
+    .filter((r) => r["@odata.type"] === "#microsoft.graph.group")
+    .map((r) => ({ id: r.id, name: r.displayName ?? r.id }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Load the full inventory. Each workload fails independently; failures are reported, never hidden. */
 export interface LoadOptions {
   skip?: WorkloadId[];
