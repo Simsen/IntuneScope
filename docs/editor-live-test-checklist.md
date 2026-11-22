@@ -1,0 +1,91 @@
+# Editor — live-tenant test checklist
+
+Things the unit tests can't prove, because they depend on how Microsoft Graph and Intune actually behave.
+Run in a **test tenant** (or with test policies only). For every Editor run, keep the downloaded backup and execution report.
+
+Record for each case: date, result (Pass / Fail / Graph rejected), and the report's `preWrite` / `written` / `readBack` if anything looks off.
+
+## Setup
+
+- [ ] Two test Entra groups: `IS-TEST-A`, `IS-TEST-B`
+- [ ] One assignment filter per platform you test (Windows 10 and later, macOS, iOS/iPadOS, Android Enterprise)
+- [ ] Graph Explorer (or PowerShell `Invoke-MgGraphRequest`) signed in to the same tenant, beta endpoint
+- [ ] IntuneScope Editor build that includes the assignment-fields fix (`@intunescope.assignment`)
+
+## 1. Assignment-level `intent` on Device configuration
+
+Before this fix the Editor sent only `{ target }`; it now also sends assignment fields such as `intent`.
+
+Docs (Graph beta, `deviceConfigurationAssignment`): `intent` (`apply` | `remove`) is writable; `source` and `sourceId` are read-only and are never sent. The live checks below confirm Graph behaves as documented.
+
+- [ ] **What Graph returns.** `GET /beta/deviceManagement/deviceConfigurations/{id}/assignments` on a few profile types. Note whether `intent` is present and its value.
+- [ ] **`intent: "apply"` is accepted on write.** Editor → Add `IS-TEST-A` to a Device configuration profile. Expect *Succeeded*. If Graph returns 400, the fix must stop sending `intent` (change `NOT_WRITTEN` in `src/lib/editor.ts`).
+- [ ] **A `remove` intent survives.** If a profile with `intent: "remove"` can be created (Graph Explorer `POST …/assign` with `"intent": "remove"`), run Editor → Add `IS-TEST-B` and check that the existing assignment still reads back with `intent: "remove"`.
+- [ ] **New assignments verify cleanly.** After any Add, the result is *Succeeded*, not *Verification failed* (a new assignment has no intent; Graph should default it to `apply`, which the signature treats as equal).
+- [ ] **Backup restore.** Take a backup's `restore` body for a profile with intent present and POST it with Graph Explorer. The assignments should come back exactly as before.
+- [ ] Same Add on a **Settings Catalog** and a **Compliance** policy. Check that their `/assign` body contains no new fields (compare `written` in the report).
+
+## 2. Targets the Editor doesn't build itself (pass-through)
+
+Unknown target types are kept and posted back as read. This was only checked in unit tests.
+
+- [ ] **Configuration Manager collection target** (tenant attach). Take an Endpoint Security policy assigned to a collection, run Editor → Change filter or Add on it, and expect either *Succeeded* with the collection kept, or a clear Graph error. Note which.
+- [ ] **Tenant-attach policies are read-only.** Settings Catalog / Endpoint Security policies whose `technologies` include `configManager` are now never written (they target collections, not Entra groups). Check that such a policy shows as read-only in the Explorer and is left out of an Editor batch.
+- [ ] **Collection swap is detected.** Unit-tested only, because these policies are no longer writable. Re-test if that ever changes.
+- [ ] **Organizational unit targets** (`organizationalUnitAssignmentTarget`, in the Graph docs). If any exist in the tenant, run an Editor Add on that policy and check that the target is kept.
+- [ ] Any other target `@odata.type` seen in the tenant (check the Explorer's "Other target" rows): Editor run, then the result and read-back.
+
+## 3. Extra properties on read-back
+
+The verify step compares group / All users / All devices targets on type, groupId and filter only. Other target types are compared on all properties.
+
+- [ ] Run one Add, one Replace, one Remove and one Change filter on a Settings Catalog, Device configuration and Compliance policy each. All should be *Succeeded*. Any *Verification failed* with an identical-looking `written` vs `readBack` means Graph added a property; note which.
+
+## 4. Filters per Device configuration profile type
+
+Graph does not validate whether a profile type supports filters. A filter on an unsupported type is silently accepted and never applies.
+
+Compare against Microsoft's "Supported workloads when creating filters" list (learn.microsoft.com → Intune → Filters → supported workloads).
+
+**Now enforced from the docs (2026-11-16):** setting a filter is refused in the preview for Wired network (Windows), the iOS/iPadOS update policy template (`iosUpdateConfiguration`), Endpoint Security Application control and security baselines (`supportsFilters` in `src/lib/normalize.ts`). Removing an existing filter stays allowed. Everything below is a spot check that the docs match reality.
+
+- [ ] On a Wired network profile, Editor → Change filter (set). Expect the preview to say the type doesn't support filters.
+- [ ] On an App Control for Business policy (Endpoint Security → Application control), same check. The docs list "Application control" under ASR exceptions, so confirm in the portal that this policy type really has no filter option. If it does, remove `endpointSecurityApplicationControl` from the block list.
+
+For each profile type in the tenant, Editor → Change filter (set a filter), then open the profile in the Intune portal:
+
+| Profile type (`@odata.type`) | Filter shown in portal? | Supported per docs? | Action |
+|---|---|---|---|
+| windows10CustomConfiguration | | | |
+| windows10GeneralConfiguration | | | |
+| windows10EndpointProtectionConfiguration | | | |
+| windowsUpdateForBusinessConfiguration (update ring) | | | |
+| windowsDomainJoinConfiguration | | | |
+| editionUpgradeConfiguration | | | |
+| windowsKioskConfiguration | | | |
+| windowsWifiConfiguration | | | |
+| macOSCustomConfiguration | | | |
+| iosGeneralDeviceConfiguration | | | |
+| iosUpdateConfiguration | | | |
+| androidDeviceOwnerGeneralDeviceConfiguration | | | |
+| androidWorkProfileGeneralDeviceConfiguration | | | |
+
+- [ ] Every "No" not already in the list above gets added to `NO_FILTER_DEVICE_CONFIGS` / `NO_FILTER_TEMPLATE_FAMILIES`.
+- [ ] Policies using **Defender for Endpoint security settings management** (`technologies` includes `microsoftSense`): filters apply to Intune-enrolled devices but are ignored for MDE-only devices such as servers. Decide whether the Editor should warn about this.
+- [ ] Also check **All users / All devices** support for the same types (e.g. domain join is device-only).
+
+## 5. Filter platforms
+
+- [ ] **Multi-platform Settings Catalog policy:** confirm that no filter is offered (expected today), and decide whether that's right.
+- [ ] **Linux Settings Catalog policy:** confirm that no filter is offered. Intune has no Linux filter platform today.
+- [ ] **Windows 8.1 compliance policy (if any exist):** only Windows 10 and later filters are offered. Decide whether to allow `windows81AndLater` or make these read-only.
+- [ ] **Android work profile (`androidForWork…` / `androidWorkProfile…` device configuration):** a filter is offered and shows correctly in the portal.
+
+## 6. Apps and scripts read-only in Editor
+
+The Editor sign-in still requests the same scopes. The two read permissions come from the app registration through admin consent.
+
+- [ ] **Before re-approval:** sign in as Editor. You can sign in without a new consent prompt. Apps, Platform scripts, Shell scripts and Remediations show as *Skipped* ("may need admin re-approval"), and a group lookup lists them under "not searched".
+- [ ] Add `DeviceManagementApps.Read.All` and `DeviceManagementScripts.Read.All` (delegated) to the **Editor** app registration and run the Editor admin consent link.
+- [ ] **After re-approval:** sign out, then sign in as Editor again. All four load, they show as read-only, a group lookup matches Explorer's result for the same group, and Bulk edit leaves them out.
+- [ ] Decode the access token (jwt.ms). `scp` contains both `Read.All` permissions even though sign-in didn't request them. If it doesn't, they must be added to `EDITOR_SCOPES` (which makes re-approval mandatory before Editor sign-in works).

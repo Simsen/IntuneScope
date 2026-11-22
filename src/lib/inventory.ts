@@ -5,11 +5,13 @@ import {
   appTypeLabel,
   deviceConfigTypeLabel,
   filterPlatformLabel,
+  isConfigManagerPolicy,
   isWritableTemplateFamily,
   normalizeAssignment,
   platformFromODataType,
   platformFromSettingsCatalog,
   settingsCatalogTypeLabel,
+  supportsFilters,
 } from "./normalize";
 
 /**
@@ -26,7 +28,7 @@ interface Adapter {
   path: string;
   select: string;
   writable: boolean;
-  map: (r: Raw) => Pick<IntuneObject, "name" | "typeLabel" | "platform"> & { writable?: false };
+  map: (r: Raw) => Pick<IntuneObject, "name" | "typeLabel" | "platform" | "filtersSupported"> & { writable?: false };
 }
 
 const byName = (r: Raw) => (r.displayName ?? r.name ?? "(unnamed)") as string;
@@ -42,8 +44,10 @@ export const ADAPTERS: Adapter[] = [
       name: byName(r),
       typeLabel: settingsCatalogTypeLabel(r.templateReference?.templateFamily),
       platform: platformFromSettingsCatalog(r.platforms),
-      // Editor v1 writes plain Settings Catalog + modern Endpoint Security only (e.g. Autopilot DPP stays read-only).
-      ...(isWritableTemplateFamily(r.templateReference?.templateFamily) ? {} : { writable: false as const }),
+      // Editor v1 writes plain Settings Catalog + modern Endpoint Security only (e.g. Autopilot DPP stays read-only),
+      // and never tenant-attach (Configuration Manager) policies, which target collections.
+      ...(isWritableTemplateFamily(r.templateReference?.templateFamily) && !isConfigManagerPolicy(r.technologies) ? {} : { writable: false as const }),
+      ...(supportsFilters({ templateFamily: r.templateReference?.templateFamily }) ? {} : { filtersSupported: false as const }),
     }),
   },
   {
@@ -52,7 +56,12 @@ export const ADAPTERS: Adapter[] = [
     path: "/deviceManagement/deviceConfigurations",
     select: "id,displayName",
     writable: true,
-    map: (r) => ({ name: byName(r), typeLabel: deviceConfigTypeLabel(r["@odata.type"]), platform: platformFromODataType(r["@odata.type"]) }),
+    map: (r) => ({
+      name: byName(r),
+      typeLabel: deviceConfigTypeLabel(r["@odata.type"]),
+      platform: platformFromODataType(r["@odata.type"]),
+      ...(supportsFilters({ odataType: r["@odata.type"] }) ? {} : { filtersSupported: false as const }),
+    }),
   },
   {
     id: "compliance",
@@ -212,7 +221,18 @@ export async function searchGroups(term: string): Promise<GroupInfo[]> {
 }
 
 /** Load the full inventory. Each workload fails independently; failures are reported, never hidden. */
-export async function loadInventory(onProgress: Progress, opts: { skip?: WorkloadId[]; skipReason?: string } = {}): Promise<Inventory> {
+export interface LoadOptions {
+  skip?: WorkloadId[];
+  skipReason?: string;
+  /**
+   * Workloads whose read permission may not be granted (e.g. Editor registrations approved before apps/scripts
+   * read access was added). A 401/403 marks them "skipped" with `optionalReason` instead of "error".
+   */
+  optional?: WorkloadId[];
+  optionalReason?: string;
+}
+
+export async function loadInventory(onProgress: Progress, opts: LoadOptions = {}): Promise<Inventory> {
   const status: WorkloadStatus[] = [
     { id: "filters", label: "Assignment filters", state: "queued", count: 0 },
     ...ADAPTERS.map((a): WorkloadStatus => ({ id: a.id, label: a.label, state: "queued", count: 0 })),
@@ -237,6 +257,7 @@ export async function loadInventory(onProgress: Progress, opts: { skip?: Workloa
   // Three workloads in parallel keeps us well under Intune's throttling limits.
   const objects: IntuneObject[] = [];
   const skip = new Set(opts.skip ?? []);
+  const optional = new Set(opts.optional ?? []);
   for (const a of ADAPTERS) if (skip.has(a.id)) set(a.id, { state: "skipped", detail: opts.skipReason ?? "Not loaded" });
   const queue = ADAPTERS.filter((a) => !skip.has(a.id));
   const worker = async () => {
@@ -248,7 +269,11 @@ export async function loadInventory(onProgress: Progress, opts: { skip?: Workloa
         objects.push(...objs);
         set(adapter.id, { state: "done", count: objs.length, detail: `${objs.length} objects` });
       } catch (e) {
-        set(adapter.id, { state: "error", error: describeError(e) });
+        if (optional.has(adapter.id) && e instanceof GraphError && (e.status === 401 || e.status === 403)) {
+          set(adapter.id, { state: "skipped", count: 0, detail: opts.optionalReason ?? "No read access" });
+        } else {
+          set(adapter.id, { state: "error", error: describeError(e) });
+        }
       }
     }
   };

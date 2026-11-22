@@ -77,6 +77,25 @@ export function isWritableTemplateFamily(templateFamily: string | undefined): bo
   return f === "none" || f.startsWith("endpointSecurity");
 }
 
+/** Tenant-attach policies (Configuration Manager) are assigned to collections, not Entra groups — never written by the Editor. */
+export function isConfigManagerPolicy(technologies: string | undefined): boolean {
+  return (technologies ?? "").split(",").some((t) => t.trim() === "configManager");
+}
+
+/**
+ * Policy types that do NOT support assignment filters, per Microsoft Learn
+ * "Platforms and policy types supported by assignment filters" (checked 2026-11-16).
+ * Graph accepts a filter on these anyway; it just never applies.
+ */
+const NO_FILTER_DEVICE_CONFIGS = new Set(["windowsWiredNetworkConfiguration", "iosUpdateConfiguration"]);
+const NO_FILTER_TEMPLATE_FAMILIES = new Set(["endpointSecurityApplicationControl", "baseline"]);
+
+export function supportsFilters(o: { odataType?: string; templateFamily?: string }): boolean {
+  if (o.odataType && NO_FILTER_DEVICE_CONFIGS.has(strip(o.odataType))) return false;
+  if (o.templateFamily && NO_FILTER_TEMPLATE_FAMILIES.has(o.templateFamily)) return false;
+  return true;
+}
+
 /** Type label for a Settings Catalog / modern Endpoint Security policy. */
 export function settingsCatalogTypeLabel(templateFamily: string | undefined): string {
   const f = templateFamily ?? "none";

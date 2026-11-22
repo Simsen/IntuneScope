@@ -8,14 +8,15 @@ vi.mock("./graph", () => ({
     status = 0;
   },
 }));
-import { buildTarget, type RawAssignment, type RawTarget } from "./editor";
+import { assignBody, buildTarget, type RawAssignment, type RawTarget } from "./editor";
 import { applyChanges, backupJson, buildPreview, type EditorIO } from "./editorRun";
 import type { IntuneObject } from "./model";
 
 const G1 = "11111111-1111-1111-1111-111111111111";
 const G2 = "22222222-2222-2222-2222-222222222222";
 const obj = (id: string): IntuneObject => ({ key: `configurationPolicies:${id}`, id, name: id, workload: "configurationPolicies", typeLabel: "", platform: "windows", writable: true, assignments: [] });
-const wrap = (ts: RawTarget[]): RawAssignment[] => ts.map((target) => ({ id: "x", source: "direct", target }));
+/** What Graph returns for a set of targets: the /assign body round-tripped, plus id and source. */
+const wrap = (ts: RawTarget[]): RawAssignment[] => assignBody(ts).assignments.map((a) => ({ id: "x", source: "direct", ...a }));
 
 /** In-memory tenant. `drift` lets a test change a policy between preview and apply. */
 function fakeTenant(initial: Record<string, RawTarget[]>, opts: { failWrite?: string; mangle?: string } = {}) {
@@ -115,5 +116,50 @@ describe("applyChanges", () => {
     expect(b.policies[0].assignments[0].target.groupId).toBe(G1);
     expect(b.policies[0].restore.path).toBe("/beta/deviceManagement/configurationPolicies/a/assign");
     expect(b.policies[0].restore.body.assignments[0].target.groupId).toBe(G1);
+  });
+});
+
+describe("assignment types beyond plain groups", () => {
+  const removeIntent = (g: string): RawTarget => ({ ...buildTarget({ kind: "group", groupId: g }, "include", null), "@intunescope.assignment": { intent: "remove" } });
+
+  it("keeps a device configuration 'remove' intent through preview, write and verify", async () => {
+    const t = fakeTenant({ a: [removeIntent(G1)] });
+    const rows = await buildPreview([obj("a")], { op: "add", target: { kind: "allDevices" }, intent: "include", filter: null }, t.io);
+    const out = await applyChanges(rows, t.io, () => {});
+    expect(out[0].status).toBe("ok");
+    const body = assignBody(t.store.get("a")!).assignments;
+    expect(body[0]).toMatchObject({ intent: "remove", target: { groupId: G1 } });
+    expect(body[1]).not.toHaveProperty("intent");
+  });
+
+  it("detects a Configuration Manager collection swapped after the preview", async () => {
+    const coll = (id: string): RawTarget => ({ "@odata.type": "#microsoft.graph.configurationManagerCollectionAssignmentTarget", collectionId: id });
+    const t = fakeTenant({ a: [coll("SMS00001")] });
+    const rows = await buildPreview([obj("a")], { op: "add", target: { kind: "allDevices" }, intent: "include", filter: null }, t.io);
+    t.store.set("a", [coll("SMS00002")]);
+    const out = await applyChanges(rows, t.io, () => {});
+    expect(out[0].status).toBe("changed");
+    expect(t.writes).toEqual([]);
+  });
+
+  it("backup restore body keeps assignment-level fields", async () => {
+    const t = fakeTenant({ a: [removeIntent(G1)] });
+    const rows = await buildPreview([obj("a")], { op: "remove", target: { kind: "group", groupId: G1 } }, t.io);
+    const restore = JSON.parse(backupJson(rows, {})).policies[0].restore.body.assignments;
+    expect(restore).toEqual([{ intent: "remove", target: expect.not.objectContaining({ "@intunescope.assignment": expect.anything() }) }]);
+  });
+});
+
+describe("policy types without filter support", () => {
+  const noFilters = { ...obj("a"), filtersSupported: false as const };
+  it("blocks setting a filter but allows removing one and plain target changes", async () => {
+    const F = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const t = fakeTenant({ a: [buildTarget({ kind: "group", groupId: G1 }, "include", { id: F, mode: "include" })] });
+    const set = await buildPreview([noFilters], { op: "add", target: { kind: "group", groupId: G2 }, intent: "include", filter: { id: F, mode: "include" } }, t.io);
+    expect(set[0].plan).toMatchObject({ status: "invalid", reason: expect.stringContaining("doesn't support assignment filters") });
+    const clear = await buildPreview([noFilters], { op: "changeFilter", match: { by: "filter", filterId: F }, filter: null }, t.io);
+    expect(clear[0].plan.status).toBe("change");
+    const plain = await buildPreview([noFilters], replaceOp, t.io);
+    expect(plain[0].plan.status).toBe("change");
   });
 });

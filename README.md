@@ -42,10 +42,14 @@ IntuneScope **Editor** requests:
 | Permission | Why |
 |---|---|
 | `DeviceManagementConfiguration.ReadWrite.All` | Read and change **assignments** of Settings Catalog, Endpoint Security, Device configuration and Compliance policies |
+| `DeviceManagementApps.Read.All` | Show apps read-only, so lookups are complete |
+| `DeviceManagementScripts.Read.All` | Show platform scripts, shell scripts and remediations read-only, so lookups are complete |
 | `Group.ReadBasic.All` | Group names and search |
 | `User.Read` | Signed-in user and tenant name |
 
-Editor never changes policy settings, apps or scripts. Apps, scripts and remediations are not loaded in Editor mode (no consent for them); Autopilot, security baselines and other templates are shown read-only.
+Editor never changes policy settings, apps or scripts. Apps, scripts and remediations are loaded **read-only** so group and filter lookups are complete; Autopilot, security baselines and other templates are also read-only.
+
+> **Upgrading an existing Editor registration:** add the two `Read.All` permissions to the Editor app registration and re-run the Editor admin consent link. Until then the Editor still signs in and works; apps and scripts are shown as *not read* and lookups say so.
 
 ### How Editor writes
 
