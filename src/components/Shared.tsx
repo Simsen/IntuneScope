@@ -18,11 +18,22 @@ export function GitHubLink() {
 export function SiteFooter() {
   return (
     <footer className="site-footer">
-      IntuneScope.app is owned and maintained by{" "}
+      Made by{" "}
       <a href="https://www.linkedin.com/in/simoneriksendk/" target="_blank" rel="noopener noreferrer">
         Simon Hartmann Eriksen
       </a>
-      .
+      {" · "}
+      <a href="https://www.simsenblog.dk/2026/11/21/introducing-intunescope/" target="_blank" rel="noopener noreferrer">
+        Read the write-up
+      </a>
+      {" · "}
+      <a href="https://www.simsenblog.dk/tools/" target="_blank" rel="noopener noreferrer">
+        More free tools
+      </a>
+      {" · "}
+      <a href="https://www.simsenblog.dk/" target="_blank" rel="noopener noreferrer">
+        simsenblog.dk
+      </a>
     </footer>
   );
 }
