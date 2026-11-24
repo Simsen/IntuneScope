@@ -238,6 +238,9 @@ table.grid .empty { text-align: center; color: var(--muted); padding: 32px; }
 .pick.active { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
 .pick-text { display: grid; gap: 2px; min-width: 0; }
 .pick-name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+/* Group lookup: "Built-in targets" / "Entra groups" headings in the list */
+.pick-name.builtin { color: var(--ok); } /* green, like the All users / All devices chips */
+.pick-section { padding: 10px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .count { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--border); color: var(--text); white-space: nowrap; }
 .count.warn { background: var(--warn-bg); color: var(--warn); font-weight: 500; }
 .card.summary { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }

@@ -93,10 +93,13 @@ export function BulkEdit({
         : view.groups.get(t.groupId)?.name ?? (inv.orphanedGroupIds.has(t.groupId) ? `Deleted group ${t.groupId.slice(0, 8)}…` : t.groupId);
 
   // --- operation form state ---
-  const hintGroupPresent = hint?.groupId && presentTargets(batch).some((p) => p.ref.kind === "group" && p.ref.groupId === hint.groupId);
-  const [opKind, setOpKind] = useState<OpKind>(hint?.filterId ? "changeFilter" : hint?.groupId ? "replace" : "add");
+  // Opened from Group lookup: start on "replace" with that group (or All Users / All Devices) as the target to replace.
+  const hintRef: TargetRef | null = hint?.groupId ? { kind: "group", groupId: hint.groupId } : hint?.builtIn ? { kind: hint.builtIn } : null;
+  const hintPresent =
+    hintRef && presentTargets(batch).some((p) => p.ref.kind === hintRef.kind && (hintRef.kind !== "group" || (p.ref.kind === "group" && p.ref.groupId === hintRef.groupId)));
+  const [opKind, setOpKind] = useState<OpKind>(hint?.filterId ? "changeFilter" : hintRef ? "replace" : "add");
   const [target, setTarget] = useState<TargetRef | null>(null);
-  const [from, setFrom] = useState<TargetRef | null>(hintGroupPresent ? { kind: "group", groupId: hint!.groupId! } : null);
+  const [from, setFrom] = useState<TargetRef | null>(hintPresent ? hintRef : null);
   const [intent, setIntent] = useState<"include" | "exclude">("include");
   const [filterId, setFilterId] = useState<string>("");
   const [filterMode, setFilterMode] = useState<"include" | "exclude">("include");

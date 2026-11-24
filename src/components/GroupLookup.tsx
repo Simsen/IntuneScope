@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { describeError } from "../lib/graph";
 import type { GroupInfo, IntuneObject, Inventory } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
-import { filterLabel, referencesToGroup, usageCounts } from "../lib/query";
+import { BUILT_IN_TARGETS, filterLabel, referencesToBuiltIn, referencesToGroup, usageCounts, type BuiltInTarget } from "../lib/query";
 import { Completeness, RelationPill, SelectionBar, Writable } from "./Shared";
 
 export function GroupLookup({
@@ -18,7 +18,8 @@ export function GroupLookup({
   parents: (groupId: string) => Promise<GroupInfo[]>;
 }) {
   const [q, setQ] = useState("");
-  const [picked, setPicked] = useState<GroupInfo | null>(null);
+  /** An Entra group, or All Users / All Devices (builtIn set). */
+  const [picked, setPicked] = useState<(GroupInfo & { builtIn?: BuiltInTarget }) | null>(null);
   const [parents, setParents] = useState<GroupInfo[] | null>(null);
   const [parentState, setParentState] = useState<"idle" | "loading" | "error">("idle");
   const [parentErr, setParentErr] = useState<string | null>(null);
@@ -27,7 +28,8 @@ export function GroupLookup({
   const [searchErr, setSearchErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const counts = useMemo(() => usageCounts(inv).groups, [inv]);
+  const usage = useMemo(() => usageCounts(inv), [inv]);
+  const counts = usage.groups;
   const candidates = useMemo(() => {
     const list: (GroupInfo & { refs: number; orphan?: boolean })[] = [];
     for (const [id, n] of counts) {
@@ -38,13 +40,15 @@ export function GroupLookup({
   }, [inv, counts]);
 
   const needle = q.trim().toLowerCase();
+  const builtInMatches = BUILT_IN_TARGETS.filter((t) => !needle || t.name.toLowerCase().includes(needle));
   const matches = needle ? candidates.filter((g) => g.name.toLowerCase().includes(needle) || g.id.includes(needle)).slice(0, 30) : candidates.slice(0, 30);
 
   // Parent groups (nested membership, any depth) are always included.
   useEffect(() => {
     setParents(null);
     setParentErr(null);
-    if (!picked) {
+    // All Users / All Devices aren't groups, so they have no parent groups.
+    if (!picked || picked.builtIn) {
       setParentState("idle");
       return;
     }
@@ -67,7 +71,10 @@ export function GroupLookup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picked?.id, loadParents]);
 
-  const refs = useMemo(() => (picked ? referencesToGroup(inv, picked.id, parents ?? []) : []), [inv, picked, parents]);
+  const refs = useMemo(
+    () => (!picked ? [] : picked.builtIn ? referencesToBuiltIn(inv, picked.builtIn) : referencesToGroup(inv, picked.id, parents ?? [])),
+    [inv, picked, parents],
+  );
   const writable = refs.filter((r) => r.object.writable).length;
   const excludes = refs.filter((r) => r.assignment.intent === "exclude").length;
   const inherited = refs.filter((r) => r.via).length;
@@ -85,7 +92,7 @@ export function GroupLookup({
     }
   }
 
-  const pick = (g: GroupInfo) => {
+  const pick = (g: GroupInfo & { builtIn?: BuiltInTarget }) => {
     setPicked(g);
     setSelected(new Set());
   };
@@ -111,6 +118,20 @@ export function GroupLookup({
             </label>
           </div>
           <ul className="pick-list">
+            {builtInMatches.length > 0 && (
+              <>
+                <li className="pick-section">Built-in targets</li>
+                {builtInMatches.map((t) => (
+                  <li key={t.kind}>
+                    <button className={picked?.builtIn === t.kind ? "pick active" : "pick"} onClick={() => pick({ id: t.kind, name: t.name, builtIn: t.kind })}>
+                      <span className="pick-name builtin">{t.name}</span>
+                      <span className="count">{usage.builtIn.get(t.kind) ?? 0}</span>
+                    </button>
+                  </li>
+                ))}
+                <li className="pick-section">Entra groups</li>
+              </>
+            )}
             {matches.map((g) => (
               <li key={g.id}>
                 <button className={picked?.id === g.id ? "pick active" : "pick"} onClick={() => pick(g)}>
@@ -149,7 +170,7 @@ export function GroupLookup({
             <div className="card">
               <h2>Pick a group</h2>
               <p className="muted">
-                See every policy, app, script and remediation that targets or excludes it. Use “Search all groups in tenant” to check a group
+                See every policy, app, script and remediation that targets or excludes it, or pick All Users or All Devices to see everything assigned to them. Use “Search all groups in tenant” to check a group
                 that nothing references yet.
               </p>
             </div>
@@ -158,7 +179,7 @@ export function GroupLookup({
               <div className="card summary">
                 <div>
                   <h1 className="page-title">{picked.name}</h1>
-                  <p className="tenant-id">{picked.id}</p>
+                  <p className={picked.builtIn ? "muted" : "tenant-id"}>{picked.builtIn ? BUILT_IN_TARGETS.find((t) => t.kind === picked.builtIn)!.description : picked.id}</p>
                 </div>
                 <div className="stats">
                   <Stat n={refs.length} label="references" />
@@ -167,6 +188,7 @@ export function GroupLookup({
                   <Stat n={refs.length - writable} label="read-only" cls="muted" />
                   <Stat n={excludes} label="as exclusion" cls="err" />
                 </div>
+                {!picked.builtIn && (
                 <div className="nested-row">
                   <span className="nested-label">Parent groups</span>
                   {parentState === "loading" && <span className="muted small">Reading group membership…</span>}
@@ -178,6 +200,7 @@ export function GroupLookup({
                     </span>
                   )}
                 </div>
+                )}
                 {parentErr && (
                   <p className="warn-inline small nested-err">Couldn't read parent groups: {parentErr}</p>
                 )}
@@ -248,7 +271,9 @@ export function GroupLookup({
                   inv={inv}
                   extra={
                     <span>
-                      {parents
+                      {picked.builtIn
+                        ? `Assignments to ${picked.name}.`
+                        : parents
                         ? `Direct references plus ${parents.length} parent group${parents.length === 1 ? "" : "s"} (nested, any depth).`
                         : "Direct references only (parent groups could not be read)."}
                     </span>
@@ -260,7 +285,7 @@ export function GroupLookup({
                 <button
                   className="btn compact"
                   disabled={!refs.length}
-                  onClick={() => onExport("xlsx", [...new Map(refs.map((r) => [r.object.key, r.object])).values()], `Group: ${picked.name}${parents ? ` (incl. ${parents.length} parent groups)` : ""}`)}
+                  onClick={() => onExport("xlsx", [...new Map(refs.map((r) => [r.object.key, r.object])).values()], `${picked.builtIn ? "Target" : "Group"}: ${picked.name}${parents ? ` (incl. ${parents.length} parent groups)` : ""}`)}
                 >
                   Export .xlsx
                 </button>
@@ -268,9 +293,9 @@ export function GroupLookup({
 
               <SelectionBar
                 count={selected.size}
-                onExport={() => onExport("xlsx", selectedObjects, `Group ${picked.name} — selection`)}
+                onExport={() => onExport("xlsx", selectedObjects, `${picked.builtIn ? "Target" : "Group"} ${picked.name} — selection`)}
                 objects={selectedObjects}
-                hint={{ groupId: picked.id }}
+                hint={picked.builtIn ? { builtIn: picked.builtIn } : { groupId: picked.id }}
               />
             </>
           )}
