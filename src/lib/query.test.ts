@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { demoParentGroups, loadDemoInventory } from "./demo";
 import type { Inventory } from "./model";
-import { referencesToGroup } from "./query";
+import { referencesToBuiltIn, referencesToGroup, usageCounts } from "./query";
 
 const byName = (inv: Inventory, name: string) => [...inv.groups.values()].find((g) => g.name === name)!;
 
@@ -27,5 +27,18 @@ describe("referencesToGroup with parent groups", () => {
     const inv = await loadDemoInventory(() => {});
     const g = byName(inv, "SG-FINANCE");
     expect(referencesToGroup(inv, g.id, [g])).toEqual(referencesToGroup(inv, g.id));
+  });
+});
+
+describe("referencesToBuiltIn", () => {
+  it("lists every assignment to All Devices / All Users, matching the counts", async () => {
+    const inv = await loadDemoInventory(() => {});
+    const { builtIn } = usageCounts(inv);
+    for (const kind of ["allDevices", "allUsers"] as const) {
+      const refs = referencesToBuiltIn(inv, kind);
+      expect(refs.every((r) => r.assignment.targetKind === kind)).toBe(true);
+      expect(refs.length).toBe(builtIn.get(kind));
+    }
+    expect(referencesToBuiltIn(inv, "allDevices").map((r) => r.object.name)).toContain("WIN - BitLocker");
   });
 });

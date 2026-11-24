@@ -56,6 +56,19 @@ export function referencesToGroup(inv: Inventory, groupId: string, parents: Grou
   return out;
 }
 
+/** The built-in Intune targets. They aren't Entra groups, so Group lookup lists them separately. */
+export type BuiltInTarget = "allUsers" | "allDevices";
+export const BUILT_IN_TARGETS: { kind: BuiltInTarget; name: string; description: string }[] = [
+  { kind: "allUsers", name: "All Users", description: "Built-in target: every licensed user" },
+  { kind: "allDevices", name: "All Devices", description: "Built-in target: every enrolled device" },
+];
+
+export function referencesToBuiltIn(inv: Inventory, kind: BuiltInTarget): Reference[] {
+  const out: Reference[] = [];
+  for (const o of inv.objects) for (const a of o.assignments) if (a.targetKind === kind) out.push({ object: o, assignment: a });
+  return out;
+}
+
 export function referencesToFilter(inv: Inventory, filterId: string): Reference[] {
   const out: Reference[] = [];
   for (const o of inv.objects) for (const a of o.assignments) if (a.filterId === filterId) out.push({ object: o, assignment: a });
@@ -63,15 +76,17 @@ export function referencesToFilter(inv: Inventory, filterId: string): Reference[
 }
 
 /** Count references per filter / per group, used for list badges. */
-export function usageCounts(inv: Inventory): { filters: Map<string, number>; groups: Map<string, number> } {
+export function usageCounts(inv: Inventory): { filters: Map<string, number>; groups: Map<string, number>; builtIn: Map<BuiltInTarget, number> } {
   const filters = new Map<string, number>();
   const groups = new Map<string, number>();
+  const builtIn = new Map<BuiltInTarget, number>([["allUsers", 0], ["allDevices", 0]]);
   for (const o of inv.objects)
     for (const a of o.assignments) {
       if (a.filterId) filters.set(a.filterId, (filters.get(a.filterId) ?? 0) + 1);
       if (a.groupId) groups.set(a.groupId, (groups.get(a.groupId) ?? 0) + 1);
+      if (a.targetKind === "allUsers" || a.targetKind === "allDevices") builtIn.set(a.targetKind, builtIn.get(a.targetKind)! + 1);
     }
-  return { filters, groups };
+  return { filters, groups, builtIn };
 }
 
 export function completeness(status: WorkloadStatus[]): { searched: string[]; notSearched: string[] } {
