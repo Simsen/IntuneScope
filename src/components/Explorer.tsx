@@ -48,6 +48,12 @@ export function Explorer({
     setTab("groups");
     window.scrollTo(0, 0);
   };
+  const [filterPick, setFilterPick] = useState<string | null>(null);
+  const openFilter = (filterId: string) => {
+    setFilterPick(filterId);
+    setTab("filters");
+    window.scrollTo(0, 0);
+  };
   // Demo mode lets anyone try the Editor against the in-memory sample tenant.
   const canWrite = editor || demo;
   const io = useMemo(() => (demo ? demoIO() : graphIO), [demo]);
@@ -152,11 +158,11 @@ export function Explorer({
             />
           ) : (
             <>
-              {tab === "policies" && <PolicyView inv={inv} onExport={onExport} onOpenTarget={openInLookup} />}
+              {tab === "policies" && <PolicyView inv={inv} onExport={onExport} onOpenTarget={openInLookup} onOpenFilter={openFilter} />}
               {tab === "groups" && (
                 <GroupLookup inv={inv} onExport={onExport} search={searchGroups} parents={parentGroups} picked={lookup} onPick={setLookup} />
               )}
-              {tab === "filters" && <FilterLookup inv={inv} onExport={onExport} />}
+              {tab === "filters" && <FilterLookup inv={inv} onExport={onExport} pickedId={filterPick} onPick={setFilterPick} />}
             </>
           )}
         </main>

@@ -11,11 +11,14 @@ export function PolicyView({
   inv,
   onExport,
   onOpenTarget,
+  onOpenFilter,
 }: {
   inv: Inventory;
   onExport: (format: "xlsx" | "csv", objects: IntuneObject[], scope: string) => void;
   /** Clicking a group / All Users / All Devices chip opens it in Group lookup. */
   onOpenTarget: (target: LookupTarget) => void;
+  /** Clicking a filter chip opens it in Filter lookup. */
+  onOpenFilter: (filterId: string) => void;
 }) {
   const [q, setQ] = useState("");
   const [platform, setPlatform] = useState<PlatformKey | "all">("all");
@@ -187,7 +190,7 @@ export function PolicyView({
                   </td>
                   <td>
                     <div className="stack">
-                      {o.assignments.map((a, i) => <FilterChip key={i} a={a} inv={inv} />)}
+                      {o.assignments.map((a, i) => <FilterChip key={i} a={a} inv={inv} onOpen={onOpenFilter} />)}
                     </div>
                   </td>
                   <td className="nowrap">

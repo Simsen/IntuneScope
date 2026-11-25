@@ -127,14 +127,29 @@ export function AssignmentChip({
 export type LookupTarget = { id: string; name: string; builtIn?: BuiltInTarget };
 
 /** The filter of one assignment, for the separate Filter column. Lines up with its AssignmentChip. */
-export function FilterChip({ a, inv }: { a: Assignment; inv: Inventory }) {
+export function FilterChip({ a, inv, onOpen }: { a: Assignment; inv: Inventory; /** When set, chips for known filters open them in Filter lookup. */ onOpen?: (filterId: string) => void }) {
   if (!a.filterId) return <span className="chip nofilter" aria-label="No filter">—</span>;
   const exclude = a.filterMode === "exclude";
-  return (
-    <span className={`chip filter ${exclude ? "fexc" : "finc"}`} title={`${exclude ? "Exclude" : "Include"} devices matching this filter`}>
+  const cls = `chip filter ${exclude ? "fexc" : "finc"}`;
+  const title = `${exclude ? "Exclude" : "Include"} devices matching this filter`;
+  const body = (
+    <>
       <FunnelIcon />
       <span className="chip-name">{filterLabel(a, inv)}</span>
       <span className="chip-meta">{exclude ? "Excl" : "Incl"}</span>
+    </>
+  );
+  // Filter lookup lists only filters it could read, so unknown filters stay plain.
+  const filterId = a.filterId;
+  if (onOpen && inv.filters.has(filterId))
+    return (
+      <button type="button" className={`${cls} chip-link`} title={`${title}\nClick to open in Filter lookup`} onClick={() => onOpen(filterId)}>
+        {body}
+      </button>
+    );
+  return (
+    <span className={cls} title={title}>
+      {body}
     </span>
   );
 }
