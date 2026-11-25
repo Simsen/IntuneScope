@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { REPO_URL } from "../config";
 import type { Assignment, IntuneObject, Inventory } from "../lib/model";
 import { useEditor, type BulkHint } from "./EditorContext";
-import { completeness, filterLabel, isOrphaned, targetName } from "../lib/query";
+import { completeness, filterLabel, isOrphaned, targetName, type BuiltInTarget } from "../lib/query";
 
 export function GitHubLink() {
   return (
@@ -70,7 +70,18 @@ const AllDevicesIcon = () => (
  * Colour tells the target apart: All users / All devices = green, Entra group = blue,
  * any exclusion = red, orphaned (deleted) group = amber, other targets = grey.
  */
-export function AssignmentChip({ a, inv, showFilter = true }: { a: Assignment; inv: Inventory; showFilter?: boolean }) {
+export function AssignmentChip({
+  a,
+  inv,
+  showFilter = true,
+  onOpen,
+}: {
+  a: Assignment;
+  inv: Inventory;
+  showFilter?: boolean;
+  /** When set, group / All Users / All Devices chips become buttons that open the target in Group lookup. */
+  onOpen?: (target: LookupTarget) => void;
+}) {
   const orphan = isOrphaned(a, inv);
   const exclude = a.intent === "exclude";
   const kind = a.targetKind === "allUsers" || a.targetKind === "allDevices" ? "all" : a.targetKind === "group" ? "grp" : "other";
@@ -78,30 +89,67 @@ export function AssignmentChip({ a, inv, showFilter = true }: { a: Assignment; i
   const sign = orphan ? "!" : exclude ? "−" : "+";
   const icon = a.targetKind === "allUsers" ? <AllUsersIcon /> : a.targetKind === "allDevices" ? <AllDevicesIcon /> : a.targetKind === "group" ? <GroupIcon /> : null;
   const what = a.targetKind === "group" ? "Entra group" : kind === "all" ? "Built-in target" : "Target";
-  return (
-    <span className={cls} title={`${exclude ? "Excluded" : "Included"} · ${what}${a.groupId ? ` · ${a.groupId}` : ""}`}>
+  const name = targetName(a, inv);
+  const target: LookupTarget | null =
+    a.targetKind === "group" && a.groupId
+      ? { id: a.groupId, name }
+      : a.targetKind === "allUsers" || a.targetKind === "allDevices"
+      ? { id: a.targetKind, name, builtIn: a.targetKind }
+      : null;
+  const title = `${exclude ? "Excluded" : "Included"} · ${what}${a.groupId ? ` · ${a.groupId}` : ""}`;
+  const body = (
+    <>
       <b>{sign}</b>
       {icon}
-      <span className="chip-name">{targetName(a, inv)}</span>
+      <span className="chip-name">{name}</span>
       {a.appIntent && <span className="chip-meta">{a.appIntent}</span>}
       {showFilter && a.filterId && (
         <span className="chip-filter">
           <FunnelIcon /> {filterLabel(a, inv)} · {a.filterMode === "exclude" ? "Excl" : "Incl"}
         </span>
       )}
+    </>
+  );
+  if (onOpen && target)
+    return (
+      <button type="button" className={`${cls} chip-link`} title={`${title}\nClick to open in Group lookup`} onClick={() => onOpen(target)}>
+        {body}
+      </button>
+    );
+  return (
+    <span className={cls} title={title}>
+      {body}
     </span>
   );
 }
 
+/** What Group lookup shows: an Entra group, or All Users / All Devices. */
+export type LookupTarget = { id: string; name: string; builtIn?: BuiltInTarget };
+
 /** The filter of one assignment, for the separate Filter column. Lines up with its AssignmentChip. */
-export function FilterChip({ a, inv }: { a: Assignment; inv: Inventory }) {
+export function FilterChip({ a, inv, onOpen }: { a: Assignment; inv: Inventory; /** When set, chips for known filters open them in Filter lookup. */ onOpen?: (filterId: string) => void }) {
   if (!a.filterId) return <span className="chip nofilter" aria-label="No filter">—</span>;
   const exclude = a.filterMode === "exclude";
-  return (
-    <span className={`chip filter ${exclude ? "fexc" : "finc"}`} title={`${exclude ? "Exclude" : "Include"} devices matching this filter`}>
+  const cls = `chip filter ${exclude ? "fexc" : "finc"}`;
+  const title = `${exclude ? "Exclude" : "Include"} devices matching this filter`;
+  const body = (
+    <>
       <FunnelIcon />
       <span className="chip-name">{filterLabel(a, inv)}</span>
       <span className="chip-meta">{exclude ? "Excl" : "Incl"}</span>
+    </>
+  );
+  // Filter lookup lists only filters it could read, so unknown filters stay plain.
+  const filterId = a.filterId;
+  if (onOpen && inv.filters.has(filterId))
+    return (
+      <button type="button" className={`${cls} chip-link`} title={`${title}\nClick to open in Filter lookup`} onClick={() => onOpen(filterId)}>
+        {body}
+      </button>
+    );
+  return (
+    <span className={cls} title={title}>
+      {body}
     </span>
   );
 }

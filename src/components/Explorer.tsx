@@ -9,7 +9,7 @@ import { GroupLookup } from "./GroupLookup";
 import { PolicyView } from "./PolicyView";
 import { BulkEdit } from "./BulkEdit";
 import { EditorContext, type BulkHint, type EditorCtx } from "./EditorContext";
-import { GitHubLink, ModeBadge } from "./Shared";
+import { GitHubLink, ModeBadge, type LookupTarget } from "./Shared";
 
 type Tab = "policies" | "groups" | "filters";
 
@@ -42,6 +42,18 @@ export function Explorer({
   const [tab, setTab] = useState<Tab>("policies");
   const [bulk, setBulk] = useState<{ objects: IntuneObject[]; hint?: BulkHint } | null>(null);
   const [stale, setStale] = useState(false);
+  const [lookup, setLookup] = useState<LookupTarget | null>(null);
+  const openInLookup = (target: LookupTarget) => {
+    setLookup(target);
+    setTab("groups");
+    window.scrollTo(0, 0);
+  };
+  const [filterPick, setFilterPick] = useState<string | null>(null);
+  const openFilter = (filterId: string) => {
+    setFilterPick(filterId);
+    setTab("filters");
+    window.scrollTo(0, 0);
+  };
   // Demo mode lets anyone try the Editor against the in-memory sample tenant.
   const canWrite = editor || demo;
   const io = useMemo(() => (demo ? demoIO() : graphIO), [demo]);
@@ -146,9 +158,11 @@ export function Explorer({
             />
           ) : (
             <>
-              {tab === "policies" && <PolicyView inv={inv} onExport={onExport} />}
-              {tab === "groups" && <GroupLookup inv={inv} onExport={onExport} search={searchGroups} parents={parentGroups} />}
-              {tab === "filters" && <FilterLookup inv={inv} onExport={onExport} />}
+              {tab === "policies" && <PolicyView inv={inv} onExport={onExport} onOpenTarget={openInLookup} onOpenFilter={openFilter} />}
+              {tab === "groups" && (
+                <GroupLookup inv={inv} onExport={onExport} search={searchGroups} parents={parentGroups} picked={lookup} onPick={setLookup} />
+              )}
+              {tab === "filters" && <FilterLookup inv={inv} onExport={onExport} pickedId={filterPick} onPick={setFilterPick} />}
             </>
           )}
         </main>

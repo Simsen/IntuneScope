@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { IntuneObject, Inventory } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
 import { referencesToFilter, targetName, usageCounts } from "../lib/query";
@@ -8,12 +8,21 @@ import { Completeness, SelectionBar, Writable } from "./Shared";
 export function FilterLookup({
   inv,
   onExport,
+  pickedId,
+  onPick,
 }: {
   inv: Inventory;
   onExport: (format: "xlsx" | "csv", objects: IntuneObject[], scope: string) => void;
+  /** The open filter. Held by Explorer so a chip click in Policies can open it, and it survives tab switches. */
+  pickedId: string | null;
+  onPick: (filterId: string) => void;
 }) {
   const [q, setQ] = useState("");
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  // Keep the picked filter visible in the list, e.g. after opening it from a chip in Policies.
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    listRef.current?.querySelector(".pick.active")?.scrollIntoView({ block: "nearest" });
+  }, [pickedId]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const counts = useMemo(() => usageCounts(inv).filters, [inv]);
   const filtersLoaded = inv.status.find((s) => s.id === "filters")?.state === "done";
@@ -40,7 +49,7 @@ export function FilterLookup({
           </label>
         </div>
         {!filtersLoaded && <p className="warn-inline small pad">Assignment filters could not be loaded.</p>}
-        <ul className="pick-list">
+        <ul className="pick-list" ref={listRef}>
           {list.map((f) => {
             const n = counts.get(f.id) ?? 0;
             return (
@@ -48,7 +57,7 @@ export function FilterLookup({
                 <button
                   className={pickedId === f.id ? "pick active" : "pick"}
                   onClick={() => {
-                    setPickedId(f.id);
+                    onPick(f.id);
                     setSelected(new Set());
                   }}
                 >

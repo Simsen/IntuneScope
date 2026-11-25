@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { IntuneObject, Inventory, PlatformKey, WorkloadId } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
 import { isOrphaned } from "../lib/query";
-import { AssignmentChip, Completeness, FilterChip, SelectionBar, Writable } from "./Shared";
+import { AssignmentChip, Completeness, FilterChip, SelectionBar, Writable, type LookupTarget } from "./Shared";
 
 type StateFilter = "any" | "unassigned" | "orphaned" | "filtered";
 const PAGE = 200;
@@ -10,9 +10,15 @@ const PAGE = 200;
 export function PolicyView({
   inv,
   onExport,
+  onOpenTarget,
+  onOpenFilter,
 }: {
   inv: Inventory;
   onExport: (format: "xlsx" | "csv", objects: IntuneObject[], scope: string) => void;
+  /** Clicking a group / All Users / All Devices chip opens it in Group lookup. */
+  onOpenTarget: (target: LookupTarget) => void;
+  /** Clicking a filter chip opens it in Filter lookup. */
+  onOpenFilter: (filterId: string) => void;
 }) {
   const [q, setQ] = useState("");
   const [platform, setPlatform] = useState<PlatformKey | "all">("all");
@@ -176,7 +182,7 @@ export function PolicyView({
                   <td>
                     <div className="stack">
                       {o.assignments.length ? (
-                        o.assignments.map((a, i) => <AssignmentChip key={i} a={a} inv={inv} showFilter={false} />)
+                        o.assignments.map((a, i) => <AssignmentChip key={i} a={a} inv={inv} showFilter={false} onOpen={onOpenTarget} />)
                       ) : (
                         <span className="chip none">Unassigned</span>
                       )}
@@ -184,7 +190,7 @@ export function PolicyView({
                   </td>
                   <td>
                     <div className="stack">
-                      {o.assignments.map((a, i) => <FilterChip key={i} a={a} inv={inv} />)}
+                      {o.assignments.map((a, i) => <FilterChip key={i} a={a} inv={inv} onOpen={onOpenFilter} />)}
                     </div>
                   </td>
                   <td className="nowrap">

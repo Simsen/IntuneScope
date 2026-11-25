@@ -1,25 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { describeError } from "../lib/graph";
 import type { GroupInfo, IntuneObject, Inventory } from "../lib/model";
 import { PLATFORM_LABEL } from "../lib/model";
-import { BUILT_IN_TARGETS, filterLabel, referencesToBuiltIn, referencesToGroup, usageCounts, type BuiltInTarget } from "../lib/query";
-import { Completeness, RelationPill, SelectionBar, Writable } from "./Shared";
+import { BUILT_IN_TARGETS, filterLabel, referencesToBuiltIn, referencesToGroup, usageCounts } from "../lib/query";
+import { Completeness, RelationPill, SelectionBar, Writable, type LookupTarget } from "./Shared";
 
 export function GroupLookup({
   inv,
   onExport,
   search,
   parents: loadParents,
+  picked,
+  onPick,
 }: {
   inv: Inventory;
   onExport: (format: "xlsx" | "csv", objects: IntuneObject[], scope: string) => void;
   search: (term: string) => Promise<GroupInfo[]>;
   /** Every group the given group is nested in (any depth). */
   parents: (groupId: string) => Promise<GroupInfo[]>;
+  /** The open target. Held by Explorer so a chip click in Policies can open it, and it survives tab switches. */
+  picked: LookupTarget | null;
+  onPick: (target: LookupTarget) => void;
 }) {
   const [q, setQ] = useState("");
-  /** An Entra group, or All Users / All Devices (builtIn set). */
-  const [picked, setPicked] = useState<(GroupInfo & { builtIn?: BuiltInTarget }) | null>(null);
   const [parents, setParents] = useState<GroupInfo[] | null>(null);
   const [parentState, setParentState] = useState<"idle" | "loading" | "error">("idle");
   const [parentErr, setParentErr] = useState<string | null>(null);
@@ -27,6 +30,12 @@ export function GroupLookup({
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Keep the picked group visible in the list, e.g. after opening it from a chip in Policies.
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    listRef.current?.querySelector(".pick.active")?.scrollIntoView({ block: "nearest" });
+  }, [picked?.id]);
 
   const usage = useMemo(() => usageCounts(inv), [inv]);
   const counts = usage.groups;
@@ -92,8 +101,8 @@ export function GroupLookup({
     }
   }
 
-  const pick = (g: GroupInfo & { builtIn?: BuiltInTarget }) => {
-    setPicked(g);
+  const pick = (g: LookupTarget) => {
+    onPick({ id: g.id, name: g.name, builtIn: g.builtIn });
     setSelected(new Set());
   };
 
@@ -117,7 +126,7 @@ export function GroupLookup({
               />
             </label>
           </div>
-          <ul className="pick-list">
+          <ul className="pick-list" ref={listRef}>
             {builtInMatches.length > 0 && (
               <>
                 <li className="pick-section">Built-in targets</li>
