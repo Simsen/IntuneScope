@@ -21,7 +21,7 @@ Hosted at **https://intunescope.app**. No install, no PowerShell, no backend.
 | **Architecture** | Static single-page app (React + TypeScript + Vite). Your browser talks directly to Microsoft Graph. |
 | **Sign-in** | Microsoft Entra, multitenant, MSAL.js with authorization code + PKCE. No client secret. |
 | **Data** | Held in memory only. Closing or refreshing the tab discards it. No analytics, no telemetry. |
-| **Hosting** | GitHub Pages, deployed only from version tags. Strict Content-Security-Policy. |
+| **Hosting** | GitHub Pages, deployed on every push to `main`. Strict Content-Security-Policy. |
 
 ## Permissions
 
@@ -88,7 +88,7 @@ Editor:   https://login.microsoftonline.com/organizations/adminconsent?client_id
 4. `cp .env.example .env.local` and set `VITE_CLIENT_ID` (and `VITE_EDITOR_CLIENT_ID` for Editor).
 5. `npm install && npm run dev` — or `npm run build` and publish `dist/` over HTTPS.
 
-For GitHub Pages: set repository variables `VITE_CLIENT_ID`, `VITE_EDITOR_CLIENT_ID` (optional) and (for a custom domain) `PAGES_DOMAIN`, enable Pages with source **GitHub Actions**, and push a `v*` tag.
+For GitHub Pages: set repository variables `VITE_CLIENT_ID`, `VITE_EDITOR_CLIENT_ID` (optional) and (for a custom domain) `PAGES_DOMAIN`, and enable Pages with source **GitHub Actions**. Every push to `main` deploys.
 
 ## Development
 

@@ -1,9 +1,9 @@
 name: Deploy to GitHub Pages
 
-# Deploys only from version tags (v*). A push to main never ships to users.
+# IntuneScope is a web app: every push to main (a merged PR) goes live.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
